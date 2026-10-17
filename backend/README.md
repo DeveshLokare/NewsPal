@@ -35,10 +35,22 @@ The tests start a throwaway Postgres 16 in Docker (Testcontainers), so Docker mu
 | `SPRING_DATASOURCE_USERNAME` | DB user | `newspal` |
 | `SPRING_DATASOURCE_PASSWORD` | DB password | `newspal` |
 | `JWT_SECRET` | HS256 signing secret, at least 32 bytes | none, required |
+| `WEBZ_TOKEN` | webz.io API token. If empty, no news is fetched and no quota is used | empty |
 
-## Endpoints so far (M1)
+Other news settings (`refresh-ttl`, `retention`, quotas, webz.io endpoint) are under `newspal.news` and `newspal.webz` in `application.yml`.
+
+## Endpoints so far
 
 - `POST /api/auth/register` `{email, password}` → `201 {token, expiresAt, user}`
 - `POST /api/auth/login` `{email, password}` → `200 {token, expiresAt, user}`
 - `GET /api/me` (Bearer token) → `200 {id, email}`
+- `GET /api/categories` (public) → `200 [{slug, name}]`
+- `GET /api/me/categories` → `200 ["technology", ...]`
+- `PUT /api/me/categories` `["technology","sports"]` → `204`
 - `GET /actuator/health` → `200 {"status":"UP"}`
+
+## Background jobs
+
+- On startup, then every hour: refresh stale categories that someone follows (at most one webz.io call per category per `refresh-ttl`).
+- Every hour at :15 (UTC): delete articles older than 3 days and keep at most 200 per category.
+- The monthly call count is stored in the `api_usage` table.

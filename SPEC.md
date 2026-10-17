@@ -157,7 +157,9 @@ newspal:
     ttl: P7D
   webz:
     base-url: https://api.webz.io
-    token: ${WEBZ_TOKEN}
+    endpoint: /newsApiLite   # configurable; webz.io docs are inconsistent about the Lite path
+    token: ${WEBZ_TOKEN:}    # empty = fetching disabled
+    timeout: PT10S
 ```
 
 ---
@@ -341,8 +343,9 @@ provider/      NewsProvider, ProviderArticle, ProviderPage, webz/WebzNewsProvide
 ### 8.2 `NewsProvider` interface
 ```java
 public interface NewsProvider {
-    List<ProviderArticle> fetchLatest(Category category, Instant since);
-    ProviderPage fetchOlder(Category category, Instant before, Instant notBefore, String cursor);
+    boolean isEnabled();                                   // false when WEBZ_TOKEN is empty → no calls, no quota
+    List<ProviderArticle> fetchLatest(String query, Instant since);          // M2
+    ProviderPage fetchOlder(String query, Instant before, Instant notBefore, String cursor); // M3
 }
 public record ProviderArticle(String url, String title, String summary, String imageUrl,
                               String source, Instant publishedAt) {}

@@ -38,3 +38,20 @@ newspal:
   jwt:
     secret: ${JWT_SECRET}
     ttl: P7D
+  news:
+    # 8 categories x 3 refreshes/day x 30 days = 720 calls (SPEC §4.2)
+    refresh-ttl: PT8H
+    retention: P3D
+    max-per-category: 200
+    summary-max-chars: 500
+    quota:
+      ingestion-monthly: 720
+      older-monthly: 250
+  webz:
+    base-url: https://api.webz.io
+    endpoint: /newsApiLite
+    # Leave empty to run without fetching news (no quota is used).
+    token: ${WEBZ_TOKEN:}
+    timeout: PT10S
+  scheduling:
+    enabled: true
