@@ -1,0 +1,15 @@
+# Local development database. Start with: docker compose up -d
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: newspal
+      POSTGRES_USER: newspal
+      POSTGRES_PASSWORD: newspal
+    ports:
+      - "5432:5432"
+    volumes:
+      - newspal-pg:/var/lib/postgresql/data
+
+volumes:
+  newspal-pg:
