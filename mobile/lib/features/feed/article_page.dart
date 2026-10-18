@@ -8,6 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/link_rules.dart';
 import '../../core/time_format.dart';
+import '../archive/bookmarks.dart';
 import 'article.dart';
 
 /// Whether articles open in an in-app WebView. On web, news sites usually
@@ -112,6 +113,7 @@ class _ArticleWebViewState extends State<_ArticleWebView> {
         appBar: AppBar(
           title: Text(article.source ?? 'Article', overflow: TextOverflow.ellipsis),
           actions: [
+            BookmarkButton(article: article),
             IconButton(
               tooltip: 'Open in browser',
               icon: const Icon(Icons.open_in_new),
@@ -181,7 +183,7 @@ class _ArticleCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final meta = [if (article.source != null) article.source!, timeAgo(article.publishedAt)].join(' · ');
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(actions: [BookmarkButton(article: article), const SizedBox(width: 4)]),
       body: SingleChildScrollView(
         child: Center(
           child: ConstrainedBox(

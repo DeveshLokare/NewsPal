@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:newspal/core/api_client.dart';
 import 'package:newspal/core/api_error.dart';
 import 'package:newspal/core/token_store.dart';
+import 'package:newspal/features/archive/archive_repository.dart';
 import 'package:newspal/features/auth/auth_repository.dart';
 import 'package:newspal/features/categories/category_repository.dart';
 import 'package:newspal/features/feed/article.dart';
@@ -69,7 +70,8 @@ class FakeCategoryRepository implements CategoryRepository {
   }
 }
 
-Article article(String id, {String? category = 'technology', int hoursAgo = 1, String? source = 'example.com'}) =>
+Article article(String id,
+        {String? category = 'technology', int hoursAgo = 1, String? source = 'example.com', bool archived = false}) =>
     Article(
       id: int.tryParse(id),
       url: 'https://example.com/$id',
@@ -79,7 +81,7 @@ Article article(String id, {String? category = 'technology', int hoursAgo = 1, S
       source: source,
       publishedAt: DateTime.now().toUtc().subtract(Duration(hours: hoursAgo)),
       category: category,
-      archived: false,
+      archived: archived,
     );
 
 /// Serves scripted pages. Keys are `category|cursor` (empty strings for null).
@@ -105,18 +107,89 @@ class FakeFeedRepository implements FeedRepository {
   }
 }
 
+/// In-memory archive keyed by URL, newest first.
+class FakeArchiveRepository implements ArchiveRepository {
+  final List<ArchiveItem> items = [];
+  int _nextId = 100;
+  ApiError? error;
+  int pageSize = 20;
+  final List<String> calls = [];
+
+  ArchiveItem seed(String id, {String? category = 'technology'}) {
+    final item = ArchiveItem(
+      id: _nextId++,
+      url: 'https://example.com/$id',
+      title: 'Saved $id',
+      summary: 'Summary of saved $id',
+      imageUrl: null,
+      source: 'example.com',
+      publishedAt: DateTime.now().toUtc().subtract(const Duration(days: 2)),
+      category: category,
+      archivedAt: DateTime.now().toUtc(),
+    );
+    items.add(item);
+    return item;
+  }
+
+  @override
+  Future<ArchivePageData> list({String? cursor, int size = 20}) async {
+    calls.add('list ${cursor ?? ''}');
+    if (error != null) throw error!;
+    final start = cursor == null ? 0 : int.parse(cursor);
+    final end = (start + pageSize).clamp(0, items.length);
+    return ArchivePageData(items: items.sublist(start, end), nextCursor: end < items.length ? '$end' : null);
+  }
+
+  @override
+  Future<ArchiveItem> add(Article article) async {
+    calls.add('add ${article.url}');
+    if (error != null) throw error!;
+    final existing = items.where((i) => i.url == article.url);
+    if (existing.isNotEmpty) return existing.first;
+    final item = ArchiveItem(
+      id: _nextId++,
+      url: article.url,
+      title: article.title,
+      summary: article.summary,
+      imageUrl: article.imageUrl,
+      source: article.source,
+      publishedAt: article.publishedAt,
+      category: article.category,
+      archivedAt: DateTime.now().toUtc(),
+    );
+    items.insert(0, item);
+    return item;
+  }
+
+  @override
+  Future<void> remove(int id) async {
+    calls.add('remove $id');
+    if (error != null) throw error!;
+    items.removeWhere((i) => i.id == id);
+  }
+
+  @override
+  Future<void> removeByUrl(String url) async {
+    calls.add('removeByUrl $url');
+    if (error != null) throw error!;
+    items.removeWhere((i) => i.url == url);
+  }
+}
+
 /// Overrides every network-facing provider with in-memory fakes.
 class Fakes {
   final store = MemoryTokenStore();
   final auth = FakeAuthRepository();
   final categories = FakeCategoryRepository();
   final feed = FakeFeedRepository();
+  final archive = FakeArchiveRepository();
 
   List<Override> get overrides => [
         tokenStoreProvider.overrideWithValue(store),
         authRepositoryProvider.overrideWithValue(auth),
         categoryRepositoryProvider.overrideWithValue(categories),
         feedRepositoryProvider.overrideWithValue(feed),
+        archiveRepositoryProvider.overrideWithValue(archive),
         // No platform WebView in tests; the reading card is used instead.
         inAppWebViewProvider.overrideWithValue(false),
       ];

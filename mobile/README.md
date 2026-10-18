@@ -41,7 +41,8 @@ lib/
     categories/  category_repository.dart, category_picker_page.dart (onboarding + settings)
     feed/        feed_page.dart (chips, pull-to-refresh, infinite scroll, older news), feed_controller.dart
                  (paging: stored → older), article_page.dart (WebView on phones; reading card on web)
-    archive/     placeholder until M6
+    archive/     archive_repository.dart, bookmarks.dart (shared bookmark state + BookmarkButton),
+                 archive_controller.dart (paging, remove/undo), archive_page.dart (swipe-to-delete)
     settings/    settings_page.dart
   widgets/    brand_wordmark.dart, coming_soon.dart
 ```

@@ -104,6 +104,25 @@ class ArchiveApiTests {
 	}
 
 	@Test
+	void deleteByUrlMatchesNormalizedUrlAndIsIdempotent() throws Exception {
+		archive(this.bearer, "{\"url\":\"https://example.com/story\",\"title\":\"S\"}").andExpect(status().isCreated());
+		String other = TestUsers.register(this.mvc, "other2@example.com");
+		archive(other, "{\"url\":\"https://example.com/story\",\"title\":\"S\"}").andExpect(status().isCreated());
+
+		this.mvc.perform(delete("/api/archive").header("Authorization", this.bearer)
+			.param("url", "https://EXAMPLE.com/story/?utm_source=feed"))
+			.andExpect(status().isNoContent());
+		this.mvc.perform(get("/api/archive").header("Authorization", this.bearer)).andExpect(jsonPath("$.items", hasSize(0)));
+		this.mvc.perform(get("/api/archive").header("Authorization", other))
+			.andExpect(jsonPath("$.items", hasSize(1)));
+
+		this.mvc.perform(delete("/api/archive").header("Authorization", this.bearer).param("url", "https://example.com/story"))
+			.andExpect(status().isNoContent());
+		this.mvc.perform(delete("/api/archive").header("Authorization", this.bearer).param("url", "javascript:x"))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
 	void validatesInput() throws Exception {
 		archive(this.bearer, "{\"url\":\"https://example.com/x\"}").andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));

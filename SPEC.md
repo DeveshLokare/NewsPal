@@ -324,6 +324,7 @@ JWT: HS256, claims `sub` = user id and `exp` = 7 days. There are no refresh toke
 
 Archive items: `{id, url, title, summary, imageUrl, source, publishedAt, category, archivedAt}`. `category` is a slug, as in feed items, and is `null` if unknown. Summaries are whitespace-flattened and trimmed to 500 chars, and a non-http(s) `imageUrl` is dropped. Deleting another user's item returns `404`, the same as a missing one.
 | `DELETE /archive/{id}` | | `204`; `404` if the item isn't the user's |
+| `DELETE /archive?url=` | | `204` (idempotent; matches the normalized URL). Used by the feed's bookmark toggle, which doesn't know the archive id. `400` for a non-http(s) URL |
 
 The server recomputes `url_hash` and never trusts a client hash. Field lengths are validated, and `url` must be http(s).
 
@@ -426,7 +427,8 @@ Bottom nav: Feed | Archive | Settings
 - **dio interceptors:** one adds the `Bearer` token. On `401`, a second interceptor clears the token and the router redirects to `/login`. Timeout is 70 s, so it lasts through a Render cold start.
 - **Cold start UX:** if a request takes more than 3 s, a banner shows "Waking up the server… this can take up to a minute."
 - **Feed provider:** holds `items`, `nextCursor`, `isLoadingMore` and `mode` (`stored` | `older`). When `nextCursor == null` in `stored` mode, it shows the "Load older news" button. In "All", that button asks the user to pick a category.
-- **Archive toggle:** optimistic. The bookmark icon updates immediately, and is reverted with a snackbar on error. The feed and archive providers are invalidated after a change.
+- **Archive toggle:** optimistic. The bookmark icon updates immediately, and is reverted with a snackbar on error. A shared per-URL override (`bookmarksProvider`) keeps the feed, the article screen and the archive in step without refetching. Toggling from the feed calls `POST /archive` or `DELETE /archive?url=`, and the archive list reloads the next time it's shown. Taps while a request is in flight are ignored.
+- **Archive list (M6):** newest-archived first, paged. Swiping left or tapping the filled bookmark removes the item at once (`DELETE /archive/{id}`). A 4 s "Undo" snackbar re-archives it (`POST /archive`, new id) at the same position.
 - **Empty states:** "No news yet, check back soon" (feed), "Nothing archived yet" (archive).
 - **Article page (`webview_flutter` + `url_launcher`):**
   - Loads the article URL in a `WebViewController` with JavaScript enabled. A progress bar shows while it loads, plus a bookmark (archive) action in the app bar.

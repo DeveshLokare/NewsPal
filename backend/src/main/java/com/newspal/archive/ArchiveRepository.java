@@ -70,6 +70,12 @@ public class ArchiveRepository {
 		return this.jdbc.sql("DELETE FROM archived_articles WHERE id = ? AND user_id = ?").params(id, userId).update() == 1;
 	}
 
+	public boolean deleteByHash(long userId, String urlHash) {
+		return this.jdbc.sql("DELETE FROM archived_articles WHERE user_id = ? AND url_hash = ?")
+			.params(userId, urlHash)
+			.update() == 1;
+	}
+
 	private static ArchiveItem map(ResultSet rs, int rowNum) throws SQLException {
 		Timestamp published = rs.getTimestamp("published_at");
 		return new ArchiveItem(rs.getLong("id"), rs.getString("url"), rs.getString("title"), rs.getString("summary"),

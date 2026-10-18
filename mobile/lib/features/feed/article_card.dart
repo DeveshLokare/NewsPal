@@ -3,17 +3,21 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 import '../../core/time_format.dart';
+import '../archive/bookmarks.dart';
 import 'article.dart';
 
 /// A feed item: image, source · time, optional category label, title, summary.
 class ArticleCard extends StatelessWidget {
-  const ArticleCard({super.key, required this.article, required this.onTap, this.categoryName});
+  const ArticleCard({super.key, required this.article, required this.onTap, this.categoryName, this.trailing});
 
   final Article article;
   final VoidCallback onTap;
 
   /// Shown as a small label in the "All" view; null hides it.
   final String? categoryName;
+
+  /// Replaces the bookmark toggle (the archive list removes with undo instead).
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +57,11 @@ class ArticleCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
                         ),
+                      ),
+                      // Pulled in so the 48px tap target doesn't push the text down.
+                      Transform.translate(
+                        offset: const Offset(12, 0),
+                        child: SizedBox(height: 28, child: trailing ?? BookmarkButton(article: article, size: 22)),
                       ),
                     ],
                   ),

@@ -44,6 +44,13 @@ public class ArchiveController {
 		return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(result.item());
 	}
 
+	/** Un-archive by article URL (feed bookmark toggle); 204 even if it wasn't archived. */
+	@DeleteMapping
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void deleteByUrl(@AuthenticationPrincipal Jwt jwt, @RequestParam String url) {
+		this.archiveService.deleteByUrl(CurrentUser.id(jwt), url);
+	}
+
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable long id) {

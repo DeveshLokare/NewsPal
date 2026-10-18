@@ -87,6 +87,19 @@ public class ArchiveService {
 		}
 	}
 
+	/**
+	 * Un-archives by article URL (normalized like on archive), for the feed's bookmark
+	 * toggle, which doesn't know the archive id. Idempotent: removing something that
+	 * isn't archived is not an error.
+	 */
+	@Transactional
+	public void deleteByUrl(long userId, String url) {
+		if (url == null || !UrlUtils.isHttpUrl(url)) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, ErrorCodes.VALIDATION_FAILED, "url must be an http(s) URL");
+		}
+		this.archive.deleteByHash(userId, UrlUtils.hash(url));
+	}
+
 	private String knownCategory(String slug) {
 		if (slug == null) {
 			return null;
