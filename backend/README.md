@@ -10,14 +10,15 @@ Requires Java 21 and Docker Desktop (running).
 docker compose up -d
 ```
 
-PowerShell:
+Then start the API with the `dev` profile (a local JWT secret, and CORS for the Flutter web app on `localhost`):
 
 ```powershell
-$env:JWT_SECRET = "change-me-to-a-long-random-string-32-bytes-plus"
-.\mvnw.cmd spring-boot:run
+.\run-dev.cmd
 ```
 
-The API listens on http://localhost:8080. Flyway creates the tables on startup.
+The API listens on http://localhost:8080. Flyway creates the tables on startup. Without the dev profile, set `JWT_SECRET` (at least 32 bytes) yourself.
+
+Local test account (created during M4 testing, only in your local Docker database): `dev-tester@newspal.test` / `localdev-pass-2026`.
 
 ## Tests
 

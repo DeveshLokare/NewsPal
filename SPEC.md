@@ -391,6 +391,28 @@ features/
 models/         article.dart, category.dart, user.dart (freezed + json_serializable)
 ```
 
+### 9.1a Theme (brand colors)
+Brand colors: **lime `#B6FF2E`** (accent) and **charcoal `#23262F`** (base). The app is **dark-first**, with charcoal as the background and lime as the accent. A light theme follows the system setting.
+
+| Role (Material 3 `ColorScheme`) | Dark (default) | Light |
+|---|---|---|
+| `primary` (buttons, selected chip, bookmark-on, progress) | `#B6FF2E` | `#B6FF2E` |
+| `onPrimary` (text/icons on lime) | `#23262F` | `#23262F` |
+| `surface` / scaffold background | `#23262F` | `#F7F8F4` |
+| `surfaceContainer` (cards, bottom bar) | `#2E323C` | `#FFFFFF` |
+| `onSurface` (body text) | `#F2F4F7` | `#23262F` |
+| `onSurfaceVariant` (source, time, hints) | `#A3A9B6` | `#5B6170` |
+| `outline` (dividers, unselected chip border) | `#3A3F4B` | `#D9DCE3` |
+| `error` | `#FF6B6B` | `#C62828` |
+
+Rules:
+- **Never use lime as text or as thin icons on a light background.** It is unreadable on white. In light mode, lime is only a fill (buttons, selected chips, the bookmark badge), with charcoal content on top.
+- Text on lime is always charcoal `#23262F`. Charcoal on lime contrasts well, and so does lime on charcoal.
+- Links inside the app (e.g. "Load older news") use lime in dark mode and charcoal with a lime underline in light mode.
+- Defined once in `app/theme.dart`, via `ColorScheme(...)` with these exact values (not `fromSeed`, which would shift the brand colors).
+
+**Logo (chosen 2026-10-18: "folded page"):** a lime newspaper sheet with a darker-lime folded corner (`#7FB81C`) and three charcoal headline lines, next to the wordmark "News" + "Pal". "Pal" is lime on dark surfaces and `onSurfaceVariant` grey on light ones. It's drawn in code (`widgets/brand_wordmark.dart`: `BrandIcon`, `BrandWordmark`), so it stays sharp at any size. Launcher icons (Android adaptive on charcoal, iOS) and the web favicon/PWA icons are generated from the same painter: `tool/brand_icons_test.dart` renders `assets/branding/*.png`, then `flutter_launcher_icons` produces every size. The app's display name is "NewsPal" on every platform.
+
 ### 9.2 Navigation
 ```
 /splash → (token?) → /feed            : else → /login
@@ -434,7 +456,7 @@ ENTRYPOINT ["sh","-c","java $JAVA_OPTS -Dserver.port=${PORT:-8080} -jar app.jar"
 - **Render Web Service:** runtime Docker, plan Free, health check path `/actuator/health`. Pick the Render region closest to the Neon region (e.g. both in Frankfurt, or both in US East) so each query has less distance to travel.
 - **Env vars:** `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET`, `WEBZ_TOKEN`.
 - **Optional:** a `render.yaml` blueprint for the web service.
-- **Local dev:** `docker-compose.yml` with `postgres:16` and the backend; Flutter runs against `http://10.0.2.2:8080` (Android emulator). The same Flyway migrations run against local Postgres and Neon.
+- **Local dev:** `docker-compose.yml` with `postgres:16`, plus the backend started with the `dev` profile (`run-dev.cmd`: local JWT secret, CORS for `http://localhost:*`). The Flutter app runs in the browser (`mobile/run-web.cmd`, http://localhost:5005) or on the Android emulator against `http://10.0.2.2:8080`. CORS is off unless `newspal.cors.allowed-origin-patterns` is set, and production doesn't set it. The same Flyway migrations run against local Postgres and Neon.
 
 ### 9.5 Database on Neon
 **Setup**

@@ -1,0 +1,14 @@
+# Launcher icons and favicon, generated from the logo renders in assets/branding/
+# (see tool/brand_icons_test.dart). Regenerate with: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/branding/app_icon.png"
+  android: true
+  adaptive_icon_background: "#23262F"
+  adaptive_icon_foreground: "assets/branding/app_icon_foreground.png"
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+    image_path: "assets/branding/app_icon.png"
+    background_color: "#23262F"
+    theme_color: "#23262F"

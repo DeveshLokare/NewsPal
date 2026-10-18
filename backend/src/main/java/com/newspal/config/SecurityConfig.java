@@ -2,6 +2,7 @@ package com.newspal.config;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -9,6 +10,7 @@ import javax.crypto.spec.SecretKeySpec;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,6 +30,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
  * Stateless JWT security (SPEC §8.3). Tokens are HS256, issued by
@@ -44,8 +48,20 @@ public class SecurityConfig {
 			{"code":"UNAUTHORIZED","message":"Authentication required","fieldErrors":[]}""";
 
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	SecurityFilterChain securityFilterChain(HttpSecurity http,
+			@Value("${newspal.cors.allowed-origin-patterns:}") List<String> corsOrigins) throws Exception {
 		AuthenticationEntryPoint entryPoint = (request, response, ex) -> writeUnauthorized(response);
+		if (!corsOrigins.isEmpty()) {
+			// Only for running the Flutter app in a browser during development; the
+			// mobile app doesn't need CORS.
+			CorsConfiguration cors = new CorsConfiguration();
+			cors.setAllowedOriginPatterns(corsOrigins);
+			cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+			cors.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+			UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+			source.registerCorsConfiguration("/api/**", cors);
+			http.cors((c) -> c.configurationSource(source));
+		}
 		http.csrf(AbstractHttpConfigurer::disable)
 			.httpBasic(AbstractHttpConfigurer::disable)
 			.formLogin(AbstractHttpConfigurer::disable)

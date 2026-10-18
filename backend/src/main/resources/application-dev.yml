@@ -1,0 +1,8 @@
+# Local development: run with --spring.profiles.active=dev (see README).
+newspal:
+  jwt:
+    # Local-only convenience; production sets JWT_SECRET.
+    secret: ${JWT_SECRET:local-dev-secret-not-for-production-use-0123456789}
+  cors:
+    # Flutter web dev server picks a random localhost port.
+    allowed-origin-patterns: http://localhost:*,http://127.0.0.1:*
