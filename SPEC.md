@@ -435,6 +435,9 @@ Bottom nav: Feed | Archive | Settings
     - **Any other site, or a non-http(s) link** (`mailto:`, `tel:`, app links): return `NavigationDecision.prevent` and call `launchUrl(uri, mode: LaunchMode.externalApplication)`. The phone's default browser or app opens it, and the article stays open in NewsPal.
     - Redirects the page makes on its own while first loading (before the user taps anything) stay in the webview, so publishers that redirect to an AMP or regional domain still load.
   - If the page fails to load, an error view offers "Retry" and "Open in browser".
+  - Links are judged against the page currently shown (after any redirect), not just the original URL. Same site means the same registrable domain, so `www.`/`m.` subdomains and `co.uk`-style suffixes are handled (`core/link_rules.dart`).
+  - **On web** (local development only), news sites refuse to load inside an iframe, so the article screen shows a reading card instead: image, title and summary, plus "Read on <source>", which opens a new tab.
+- **Feed paging (M5):** each chip has its own list. Stored pages come first; at the end, "Load older news" switches that list to the older-news endpoint (only for a single category). `QUOTA_EXHAUSTED` and `OLDER_RATE_LIMITED` become calm notices, and other failures keep the list and offer "Try again". The feed and chips reset when the signed-in user changes.
   - Android back button: go back in the webview's history if possible, otherwise close the article page.
 - **API base URL:** set via `--dart-define=API_BASE_URL=...`.
 

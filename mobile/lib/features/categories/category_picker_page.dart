@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../core/api_error.dart';
 import '../auth/auth_controller.dart';
 import '../auth/auth_form.dart' show ButtonSpinner;
+import '../feed/feed_controller.dart';
 import 'category_repository.dart';
 
 enum PickerMode {
@@ -74,6 +75,9 @@ class _CategoryPickerPageState extends ConsumerState<CategoryPickerPage> {
       final ordered = [for (final c in catalog) if (_selected.contains(c.slug)) c.slug];
       await ref.read(categoryRepositoryProvider).saveMine(ordered);
       if (!mounted) return;
+      // Chips and feeds depend on the followed categories.
+      ref.invalidate(followedCategoriesProvider);
+      ref.invalidate(feedControllerProvider);
       if (_onboarding) {
         ref.read(authControllerProvider.notifier).categoriesSaved();
       } else {

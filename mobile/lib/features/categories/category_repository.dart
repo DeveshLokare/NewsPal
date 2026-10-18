@@ -22,6 +22,16 @@ final allCategoriesProvider = FutureProvider<List<Category>>(
   (ref) => ref.watch(categoryRepositoryProvider).all(),
 );
 
+/// The user's categories with display names, in catalog order (feed chips).
+/// Invalidate after the user changes their categories.
+final followedCategoriesProvider = FutureProvider<List<Category>>((ref) async {
+  // Per user: reload when someone else signs in.
+  ref.watch(sessionTokenProvider);
+  final catalog = await ref.watch(allCategoriesProvider.future);
+  final mine = (await ref.watch(categoryRepositoryProvider).mine()).toSet();
+  return catalog.where((c) => mine.contains(c.slug)).toList();
+});
+
 abstract interface class CategoryRepository {
   Future<List<Category>> all();
   Future<List<String>> mine();

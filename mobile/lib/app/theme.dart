@@ -52,6 +52,10 @@ ThemeData buildTheme(ColorScheme scheme) {
       backgroundColor: scheme.surface,
       foregroundColor: scheme.onSurface,
       elevation: 0,
+      // Material 3 tints a scrolled-under app bar with the primary color, which
+      // turns charcoal olive; keep it flat.
+      scrolledUnderElevation: 0,
+      surfaceTintColor: Colors.transparent,
       centerTitle: false,
     ),
     filledButtonTheme: FilledButtonThemeData(

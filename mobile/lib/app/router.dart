@@ -7,6 +7,8 @@ import '../features/auth/auth_controller.dart';
 import '../features/auth/login_page.dart';
 import '../features/auth/register_page.dart';
 import '../features/categories/category_picker_page.dart';
+import '../features/feed/article.dart';
+import '../features/feed/article_page.dart';
 import '../features/feed/feed_page.dart';
 import '../features/settings/settings_page.dart';
 import 'home_shell.dart';
@@ -21,6 +23,7 @@ abstract final class Routes {
   static const archive = '/archive';
   static const settings = '/settings';
   static const editCategories = '/settings/categories';
+  static const article = '/article';
 }
 
 /// Where the auth state says the user should be, or null to stay (SPEC §9.2).
@@ -57,6 +60,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.splash, builder: (_, _) => const SplashPage()),
       GoRoute(path: Routes.login, builder: (_, _) => const LoginPage()),
       GoRoute(path: Routes.register, builder: (_, _) => const RegisterPage()),
+      // Full screen, above the bottom navigation; the article travels as `extra`.
+      GoRoute(
+        path: Routes.article,
+        builder: (_, state) => ArticlePage(article: state.extra is Article ? state.extra as Article : null),
+      ),
       GoRoute(
         path: Routes.onboarding,
         builder: (_, _) => const CategoryPickerPage(mode: PickerMode.onboarding),

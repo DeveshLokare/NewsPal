@@ -64,7 +64,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(fakes.categories.saved.single, ['technology', 'sports'], reason: 'saved in catalog order');
-    expect(find.text('Your feed is on its way'), findsOneWidget);
+    expect(find.text('No news yet'), findsOneWidget);
   });
 
   testWidgets('duplicate email is shown on the email field', (tester) async {
@@ -84,7 +84,7 @@ void main() {
     fakes.storeSession();
     fakes.categories.followed = ['business'];
     await pumpApp(tester);
-    expect(find.text('Your feed is on its way'), findsOneWidget);
+    expect(find.text('No news yet'), findsOneWidget);
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();

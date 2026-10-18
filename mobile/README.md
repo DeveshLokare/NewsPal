@@ -34,11 +34,13 @@ lib/
   main.dart
   app/        app.dart (MaterialApp + "waking server" banner), router.dart (go_router + auth redirects),
               theme.dart (brand colors), home_shell.dart (bottom nav), splash_page.dart
-  core/       api_client.dart (dio + auth header + 401 sign-out), api_error.dart, token_store.dart, env.dart
+  core/       api_client.dart (dio + auth header + 401 sign-out), api_error.dart, token_store.dart, env.dart,
+              link_rules.dart (which links leave the app), time_format.dart
   features/
     auth/        auth_controller.dart (session state), auth_repository.dart, login/register pages
     categories/  category_repository.dart, category_picker_page.dart (onboarding + settings)
-    feed/        placeholder until M5
+    feed/        feed_page.dart (chips, pull-to-refresh, infinite scroll, older news), feed_controller.dart
+                 (paging: stored → older), article_page.dart (WebView on phones; reading card on web)
     archive/     placeholder until M6
     settings/    settings_page.dart
   widgets/    brand_wordmark.dart, coming_soon.dart
