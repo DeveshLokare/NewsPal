@@ -113,6 +113,9 @@ public class WebzNewsProvider implements NewsProvider {
 			variables.put("q", query + " published:<" + before.toEpochMilli());
 			// The default search window is 3 days; ts widens it back to notBefore.
 			variables.put("ts", notBefore.toEpochMilli());
+			// Newest first: with sort=crawled, webz.io pages forward from ts (oldest first).
+			variables.put("sort", "published");
+			variables.put("order", "desc");
 			result = call((builder) -> buildUri(builder, variables), query);
 		}
 		return new ProviderPage(result.articles(), result.hasMore() ? result.next() : null);
@@ -159,13 +162,21 @@ public class WebzNewsProvider implements NewsProvider {
 		}
 	}
 
+	/**
+	 * Builds a request URI. Optional variables: {@code ts} (epoch millis) and
+	 * {@code sort}/{@code order} (default: {@code sort=crawled}, webz.io's default
+	 * order).
+	 */
 	URI buildUri(UriBuilder builder, Map<String, Object> variables) {
 		// Template variables are fully encoded, which matters for quotes and colons in q.
 		builder.path(this.properties.endpoint())
 			.queryParam("token", "{token}")
 			.queryParam("q", "{q}")
-			.queryParam("sort", "crawled")
-			.queryParam("format", "json")
+			.queryParam("sort", variables.getOrDefault("sort", "crawled"));
+		if (variables.containsKey("order")) {
+			builder.queryParam("order", "{order}");
+		}
+		builder.queryParam("format", "json")
 			.queryParam("size", PAGE_SIZE)
 			// Skip syndicated copies of the same story from other sites.
 			.queryParam("includeSyndicated", "false");

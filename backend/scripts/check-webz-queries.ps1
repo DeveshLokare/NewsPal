@@ -59,7 +59,9 @@ foreach ($c in $categories) {
     # Same parameters as WebzNewsProvider (fetchLatest without ts, or fetchOlder with -Older).
     $q = $c.query
     $extra = ""
+    $sort = "sort=crawled"
     if ($Older) {
+        $sort = "sort=published&order=desc"
         $now = [DateTimeOffset]::UtcNow
         $beforeMs = $now.AddDays(-7).ToUnixTimeMilliseconds()
         $q = "$q published:<$beforeMs"
@@ -67,7 +69,7 @@ foreach ($c in $categories) {
         Write-Host ("before = {0:u}" -f $now.AddDays(-7))
     }
     $uri = "$BaseUrl$Endpoint" + "?token=" + [uri]::EscapeDataString($token) + "&q=" + [uri]::EscapeDataString($q) +
-        "&sort=crawled&format=json&size=$Size&includeSyndicated=false" + $extra
+        "&$sort&format=json&size=$Size&includeSyndicated=false" + $extra
     $entry = [ordered]@{ slug = $c.slug; query = $q }
     try {
         $raw = Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 30

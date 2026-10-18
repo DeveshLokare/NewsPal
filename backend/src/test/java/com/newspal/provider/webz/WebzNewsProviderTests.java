@@ -35,6 +35,14 @@ class WebzNewsProviderTests {
 	}
 
 	@Test
+	void olderNewsSortsByPublishedNewestFirst() {
+		URI uri = this.provider.buildUri(new DefaultUriBuilderFactory("https://api.webz.io").builder(),
+				Map.of("token", "t", "q", "x published:<100", "ts", 50L, "sort", "published", "order", "desc"));
+		assertThat(uri.getRawQuery()).isEqualTo("token=t&q=x%20published%3A%3C100&sort=published&order=desc"
+				+ "&format=json&size=10&includeSyndicated=false&ts=50");
+	}
+
+	@Test
 	void omitsTsWhenNoSince() {
 		URI uri = this.provider.buildUri(new DefaultUriBuilderFactory("https://api.webz.io").builder(),
 				Map.of("token", "t", "q", "x"));

@@ -178,7 +178,7 @@ newspal:
 - Limits: per user `older.per-user-daily` (10) cache-missing lookups per UTC day, kept in memory (a restart resetting it is acceptable for a hobby app). Global: the `older` bucket in `api_usage` (8/month on the current credit).
 - When a limit is hit → `429` with code `OLDER_RATE_LIMITED` (per user) or `QUOTA_EXHAUSTED` (global quota, provider disabled, or webz.io balance too low). A webz.io failure → `502 PROVIDER_ERROR`; failures are not cached.
 - Posts with no text are dropped, the same as for stored articles.
-- **Live check (2026-10-18):** the `published:<ms` filter works, since every result was published before the cutoff. **Known issue:** with `sort=crawled`, webz.io pages forward from `ts`, so the first older page shows the *oldest* stories (about 30 days back), not the ones just before the cutoff. Next step: test `sort=published&order=desc` for older-news calls.
+- **Live check (2026-10-18):** the `published:<ms` filter works. With `sort=crawled`, webz.io paged forward from `ts`, so the first page showed stories from about 30 days back. Older-news calls therefore use **`sort=published&order=desc`**. Verified live: the first page starts right at the cutoff and goes newest first. Ingestion keeps `sort=crawled`, so `ts` returns only newly crawled posts.
 - Older articles have no DB `id`, so archiving them sends the full article details (§6.6).
 - "All" view: older news is loaded **one category at a time**. The UI asks the user to choose a category chip first, which avoids spending N calls per tap.
 
