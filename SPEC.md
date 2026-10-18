@@ -30,10 +30,9 @@ Push notifications, free-text keyword search, custom topics, social sharing, rea
 ### 1.4 External constraints (verify before building, as they change)
 | Constraint | Value (as of 2026-10) | Impact |
 |---|---|---|
-| webz.io Lite monthly calls | ~1,000 / month | Drives the refresh interval (§4.4) |
-| webz.io Lite articles per call | up to 10 | One refresh gives at most 10 new articles per category |
-| webz.io Lite history | ~30 days back | Older news is limited to 30 days (§5) |
-| webz.io Lite licence | Non-commercial | Fine for a hobby app; don't monetize |
+| webz.io `/api/news` pricing | ~0.005 credit per post (0.06 per 10-post call); credit refills monthly (~5.00 assumed) | ~83 calls/month; drives the refresh interval (§4.2) |
+| webz.io rate limit | HTTP 429 for back-to-back calls | Calls are spaced ≥ 2 s apart (`min-interval`) |
+| webz.io history | ~30 days back (`allowNewsHistory` needed beyond that) | Older news is limited to 30 days (§5) |
 | Render free web service | Sleeps after 15 min without traffic; about 1 min to wake | No reliable cron, so refresh is lazy (§4.3); slow first request |
 | Render free filesystem | Erased on spin-down | Keep all state in Postgres |
 | Neon free storage | 0.5 GB per project | Our usage is ~1.5 MB of articles plus users and archives, so this is not a concern |
@@ -90,24 +89,28 @@ Categories are rows in the `categories` table, seeded by a Flyway migration. The
 
 ### 4.1 Hot path / cold path
 ```
-                 ┌─────────────── hot path (≤ 3 days) ───────────────┐
+                 ┌─────────────── hot path (≤ 7 days) ───────────────┐
 Flutter ──JWT──▶ Spring Boot ──▶ PostgreSQL (articles)                │
                      │  ▲                                             │
                      │  └── lazy refresh when category is stale ──▶ webz.io
                      │                                                │
-                     └─ cold path (> 3 days, not stored) ──Caffeine──▶ webz.io
+                     └─ cold path (> 7 days, not stored) ──Caffeine──▶ webz.io
 ```
 
 ### 4.2 Quota budget
-webz.io allows **1,000 calls / month**. They are split as follows:
+> **Revised 2026-10-18 after testing the live API.** The account uses `/api/news`, which is billed from a credit balance that refills monthly, not a fixed call count. Measured: **0.06 credit for a 10-post call, 0.11 for 20 posts**, so it is roughly 0.005 per post. Assuming a monthly credit of **~5.00**, that's about **83 calls of 10 posts per month**.
 
 | Bucket | Calls / month | Notes |
 |---|---|---|
-| Ingestion (hot path) | 720 | 8 categories × 3 refreshes/day × 30 days |
-| Older news (cold path) | 250 | Shared by all users; cached |
-| Safety margin | 30 | Retries, manual tests |
+| Ingestion (hot path) | 68 | 8 categories refreshed every 3.5 days ≈ 69 calls |
+| Older news (cold path) | 8 | Shared by all users; cached |
+| Safety margin | ~7 | Retries, manual tests |
 
-So **`refresh-ttl` = 8 h**: each category is refreshed at most once every 8 hours. The feed shows news that is **at most ~8 h old** when it was fetched. This is the cost of the free tier; a paid key only needs a smaller `refresh-ttl`.
+So **`refresh-ttl` = 84 h (3.5 days)** and **`retention` = 7 days**. Retention must be longer than the refresh interval, or a category's feed would empty out between refreshes. Each category gains about 10 articles every 3.5 days.
+
+**Balance guard:** every `/api/news` response includes `balance`. When it falls below `newspal.webz.min-balance` (0.30), the provider reports itself disabled for the rest of the calendar month. This holds even if the monthly credit estimate above is wrong.
+
+**To get fresher news:** follow fewer categories, raise the monthly credit (`refresh-ttl` and the quotas are plain config), or switch to another provider behind `NewsProvider`.
 
 Usage is counted in the `api_usage` table, so the counts survive Render restarts. Before **every** webz.io call, the backend checks the bucket's monthly limit and skips the call when the limit is reached.
 
@@ -128,7 +131,7 @@ Refreshing one category:
 ### 4.4 Retention (`CleanupService`)
 Runs at startup and `@Scheduled(cron = "0 15 * * * *")`:
 ```sql
-DELETE FROM articles WHERE published_at < now() - interval '3 days';
+DELETE FROM articles WHERE published_at < now() - interval '7 days';  -- newspal.news.retention
 DELETE FROM articles a USING (
   SELECT id, row_number() OVER (PARTITION BY category_id ORDER BY published_at DESC) rn
   FROM articles) r
@@ -136,19 +139,19 @@ WHERE a.id = r.id AND r.rn > 200;
 ```
 Archived articles live in a separate table and are **never** affected.
 
-**Storage estimate:** 8 categories × ~90 articles (3 days × 3 refreshes × 10) × ~2 KB ≈ **1.5 MB**. The 200-per-category cap only matters if `refresh-ttl` is lowered.
+**Storage estimate:** 8 categories × ~20 articles (7 days ÷ 3.5 days × 10) × ~2 KB ≈ **0.3 MB**. The 200-per-category cap only matters if `refresh-ttl` is lowered.
 
 ### 4.5 Configuration (`application.yml`, overridable by env)
 ```yaml
 newspal:
   news:
-    refresh-ttl: PT8H
-    retention: P3D
+    refresh-ttl: PT84H
+    retention: P7D
     max-per-category: 200
     summary-max-chars: 500
     quota:
-      ingestion-monthly: 720
-      older-monthly: 250
+      ingestion-monthly: 68
+      older-monthly: 8
     older:
       cache-ttl: PT1H
       per-user-daily: 10
@@ -520,5 +523,5 @@ pg_dump --no-owner -Fc -t users -t user_categories -t archived_articles "$NEON_U
 ## 13. Open questions
 1. ~~App name~~ → **Decided: NewsPal.** App icon still to be designed.
 2. ~~Article opening~~ → **Decided:** articles open in the app; links to other sites open in the default browser (§9.3).
-3. ~~News freshness~~ → **Decided:** news up to ~8 h old is acceptable; `refresh-ttl` stays at `PT8H`.
+3. ~~News freshness~~ → **Decided:** news up to ~8 h old was accepted, but the real webz.io pricing (§4.2) forces `refresh-ttl` = `PT84H` (3.5 days) on the ~5.00 monthly credit.
 4. ~~Database host~~ → **Decided: Neon free plan** (no expiry; §9.5).

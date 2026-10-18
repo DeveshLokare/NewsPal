@@ -52,5 +52,13 @@ Other news settings (`refresh-ttl`, `retention`, quotas, webz.io endpoint) are u
 ## Background jobs
 
 - On startup, then every hour: refresh stale categories that someone follows (at most one webz.io call per category per `refresh-ttl`).
-- Every hour at :15 (UTC): delete articles older than 3 days and keep at most 200 per category.
-- The monthly call count is stored in the `api_usage` table.
+- Every hour at :15 (UTC): delete articles older than 7 days and keep at most 200 per category.
+- The monthly call count is stored in the `api_usage` table. Fetching also pauses for the month once webz.io reports a balance below 0.30.
+
+## Checking category queries against webz.io
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check-webz-queries.ps1 [-Only sports] [-Size 10]
+```
+
+The script asks for the token without echoing it, makes one call per category (each costs credit), and writes a summary to `target/webz-check.json`.

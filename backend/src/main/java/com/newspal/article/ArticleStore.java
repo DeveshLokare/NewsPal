@@ -42,7 +42,9 @@ public class ArticleStore {
 	public int insertNew(short categoryId, List<ProviderArticle> articles, int summaryMaxChars) {
 		int inserted = 0;
 		for (ProviderArticle article : articles) {
-			if (!UrlUtils.isHttpUrl(article.url())) {
+			String summary = collapseWhitespace(article.summary());
+			// Posts without any text are videos, social posts or listings, not articles.
+			if (!UrlUtils.isHttpUrl(article.url()) || summary == null) {
 				continue;
 			}
 			inserted += this.jdbc.sql("""
@@ -52,7 +54,7 @@ public class ArticleStore {
 				.param("hash", UrlUtils.hash(article.url()))
 				.param("url", article.url().trim())
 				.param("title", truncate(article.title(), TITLE_MAX))
-				.param("summary", truncate(collapseWhitespace(article.summary()), summaryMaxChars))
+				.param("summary", truncate(summary, summaryMaxChars))
 				.param("image", (article.imageUrl() != null && UrlUtils.isHttpUrl(article.imageUrl())) ? article.imageUrl() : null)
 				.param("source", truncate(article.source(), SOURCE_MAX))
 				.param("published", Timestamp.from(article.publishedAt()))

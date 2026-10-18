@@ -36,8 +36,9 @@ public class WebzResponseParser {
 			}
 		}
 		String next = text(root, "next");
-		Integer requestsLeft = integer(root, "requests_left", "requestsLeft");
-		return new Result(articles, next, requestsLeft);
+		// /api/news reports "balance"; other webz.io APIs use requests_left / requestsLeft.
+		Double remaining = number(root, "balance", "requests_left", "requestsLeft");
+		return new Result(articles, next, remaining);
 	}
 
 	private static ProviderArticle toArticle(JsonNode post) {
@@ -48,7 +49,9 @@ public class WebzResponseParser {
 		if (url == null || title == null || publishedAt == null) {
 			return null;
 		}
-		return new ProviderArticle(url, title, text(post, "text"), text(thread, "main_image"),
+		// Prefer webz.io's own summary; "text" is the full article body.
+		String summary = firstNonBlank(text(post, "summary"), text(post, "text"));
+		return new ProviderArticle(url, title, summary, text(thread, "main_image"),
 				firstNonBlank(text(thread, "site"), text(thread, "site_full")), publishedAt);
 	}
 
@@ -61,11 +64,11 @@ public class WebzResponseParser {
 		return text.isEmpty() ? null : text;
 	}
 
-	private static Integer integer(JsonNode node, String... fields) {
+	private static Double number(JsonNode node, String... fields) {
 		for (String field : fields) {
 			JsonNode value = node.path(field);
 			if (value.isNumber()) {
-				return value.asInt();
+				return value.asDouble();
 			}
 		}
 		return null;
@@ -87,7 +90,7 @@ public class WebzResponseParser {
 		}
 	}
 
-	public record Result(List<ProviderArticle> articles, String next, Integer requestsLeft) {
+	public record Result(List<ProviderArticle> articles, String next, Double remaining) {
 	}
 
 }

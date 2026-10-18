@@ -39,19 +39,25 @@ newspal:
     secret: ${JWT_SECRET}
     ttl: P7D
   news:
-    # 8 categories x 3 refreshes/day x 30 days = 720 calls (SPEC §4.2)
-    refresh-ttl: PT8H
-    retention: P3D
+    # webz.io /api/news bills ~0.06 credit per 10-post call; ~5.00 credit/month = ~83 calls (SPEC §4.2).
+    # 8 categories refreshed every 3.5 days = ~69 calls/month.
+    refresh-ttl: PT84H
+    # Must exceed refresh-ttl or feeds empty out between refreshes.
+    retention: P7D
     max-per-category: 200
     summary-max-chars: 500
     quota:
-      ingestion-monthly: 720
-      older-monthly: 250
+      ingestion-monthly: 68
+      older-monthly: 8
   webz:
     base-url: https://api.webz.io
-    endpoint: /newsApiLite
+    endpoint: /api/news
     # Leave empty to run without fetching news (no quota is used).
     token: ${WEBZ_TOKEN:}
     timeout: PT10S
+    # webz.io returns HTTP 429 for back-to-back calls.
+    min-interval: PT2S
+    # Stop calling for the rest of the month once webz.io reports a balance below this.
+    min-balance: 0.30
   scheduling:
     enabled: true

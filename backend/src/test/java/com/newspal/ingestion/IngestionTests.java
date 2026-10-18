@@ -75,6 +75,16 @@ class IngestionTests {
 	}
 
 	@Test
+	void postsWithoutTextAreSkipped() {
+		this.provider.nextResult = List.of(article("https://example.com/real", hoursAgo(1)),
+				new ProviderArticle("https://dailymotion.com/video/x1", "Episode 4 English Sub", null, null,
+						"dailymotion.com", hoursAgo(1)),
+				new ProviderArticle("https://example.com/blank", "Blank", " \n ", null, "example.com", hoursAgo(1)));
+		assertThat(this.ingestion.refreshIfStale(category("entertainment"))).isEqualTo(1);
+		assertThat(articleCount()).isEqualTo(1);
+	}
+
+	@Test
 	void freshCategoryIsNotRefetched() {
 		this.ingestion.refreshIfStale(category("sports"));
 		this.ingestion.refreshIfStale(category("sports"));
@@ -106,12 +116,12 @@ class IngestionTests {
 
 	@Test
 	void exhaustedQuotaSkipsTheProvider() {
-		this.jdbc.sql("INSERT INTO api_usage (month, bucket, calls) VALUES (?, 'ingestion', 720)")
+		this.jdbc.sql("INSERT INTO api_usage (month, bucket, calls) VALUES (?, 'ingestion', 68)")
 			.param(this.quota.currentMonth())
 			.update();
 		this.ingestion.refreshIfStale(category("world"));
 		assertThat(this.provider.calls).hasValue(0);
-		assertThat(this.quota.used(Bucket.INGESTION)).isEqualTo(720);
+		assertThat(this.quota.used(Bucket.INGESTION)).isEqualTo(68);
 	}
 
 	@Test
