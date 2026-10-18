@@ -49,6 +49,10 @@ newspal:
     quota:
       ingestion-monthly: 68
       older-monthly: 8
+    older:
+      cache-ttl: PT1H
+      per-user-daily: 10
+      max-age: P30D
   webz:
     base-url: https://api.webz.io
     endpoint: /api/news

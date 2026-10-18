@@ -14,7 +14,8 @@ param(
     [string]$BaseUrl = "https://api.webz.io",
     [string]$Endpoint = "/api/news",
     [string]$Only = "",  # optional slug to test a single category
-    [int]$Size = 10      # posts per call; compare "cost" across sizes to learn the pricing
+    [int]$Size = 10,     # posts per call; compare "cost" across sizes to learn the pricing
+    [switch]$Older       # mimic /api/feed/older: published before now-7d, back to now-30d
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,10 +56,19 @@ foreach ($c in $categories) {
     # webz.io answers HTTP 429 to back-to-back calls.
     if (-not $first) { Start-Sleep -Seconds 2 }
     $first = $false
-    # Same parameters as WebzNewsProvider.buildUri (no ts: the default 3-day window).
-    $uri = "$BaseUrl$Endpoint" + "?token=" + [uri]::EscapeDataString($token) + "&q=" + [uri]::EscapeDataString($c.query) +
-        "&sort=crawled&format=json&size=$Size&includeSyndicated=false"
-    $entry = [ordered]@{ slug = $c.slug; query = $c.query }
+    # Same parameters as WebzNewsProvider (fetchLatest without ts, or fetchOlder with -Older).
+    $q = $c.query
+    $extra = ""
+    if ($Older) {
+        $now = [DateTimeOffset]::UtcNow
+        $beforeMs = $now.AddDays(-7).ToUnixTimeMilliseconds()
+        $q = "$q published:<$beforeMs"
+        $extra = "&ts=" + $now.AddDays(-30).ToUnixTimeMilliseconds()
+        Write-Host ("before = {0:u}" -f $now.AddDays(-7))
+    }
+    $uri = "$BaseUrl$Endpoint" + "?token=" + [uri]::EscapeDataString($token) + "&q=" + [uri]::EscapeDataString($q) +
+        "&sort=crawled&format=json&size=$Size&includeSyndicated=false" + $extra
+    $entry = [ordered]@{ slug = $c.slug; query = $q }
     try {
         $raw = Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 30
         $json = $raw.Content | ConvertFrom-Json

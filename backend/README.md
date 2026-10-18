@@ -47,6 +47,11 @@ Other news settings (`refresh-ttl`, `retention`, quotas, webz.io endpoint) are u
 - `GET /api/categories` (public) → `200 [{slug, name}]`
 - `GET /api/me/categories` → `200 ["technology", ...]`
 - `PUT /api/me/categories` `["technology","sports"]` → `204`
+- `GET /api/feed?category=&cursor=&size=` → `200 {items, nextCursor, lastRefreshedAt}` (stored articles, newest first)
+- `GET /api/feed/older?category=&cursor=` → `200 {items, nextCursor}` (live from webz.io, cached 1 h, not stored)
+- `GET /api/archive?cursor=&size=` → `200 {items, nextCursor}`
+- `POST /api/archive` `{url, title, summary?, imageUrl?, source?, publishedAt?, category?}` → `201` new / `200` existing
+- `DELETE /api/archive/{id}` → `204`
 - `GET /actuator/health` → `200 {"status":"UP"}`
 
 ## Background jobs

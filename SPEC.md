@@ -170,11 +170,15 @@ newspal:
 ## 5. Older news (cold path)
 
 - `GET /api/feed/older?category={slug}&cursor={opaque}`
-  - Without `cursor`: the backend asks webz.io for posts in that category published **before** `now − retention`, going back at most 30 days.
-  - With `cursor`: it continues from webz.io's `next` token. The cursor is base64 of the provider's next URL. It is opaque to the app and must point at the webz.io host, which the server validates.
-- Results are **not stored**. They are cached in Caffeine under the key `(category, cursor)` with a 1 h TTL. Cache hits don't count against the quota or the per-user limit.
-- Limits: per user 10 cache-miss calls/day, kept in memory (a restart resetting it is acceptable for a hobby app). Global: the `older` bucket in `api_usage`.
-- When a limit is hit → `429` with code `OLDER_RATE_LIMITED` (per user) or `QUOTA_EXHAUSTED` (global).
+  - `category` is required and must be one the user follows (`400` otherwise).
+  - Without `cursor`: the backend asks webz.io for posts in that category published **before** `now − retention` (rounded down to the hour, via `published:<ms` in `q`), going back at most `older.max-age` (30 days, via `ts`).
+  - With `cursor`: continues where the previous page ended.
+  - **Cursors are server-side (changed in M3).** webz.io's `next` path contains the API token, so it never leaves the server. The app gets a random id that maps to it in memory for `older.cache-ttl` (1 h). An unknown or expired id, or an id used with a different category, returns `400 BAD_CURSOR`, and the app starts again from the first page.
+- Results are **not stored**. Each page is cached in Caffeine for 1 h, keyed by (category, hour) for first pages and by cursor id after that, so everyone asking within the hour shares one call. Cache hits don't count against the quota or the per-user limit. The `archived` flag is worked out per user on every response.
+- Limits: per user `older.per-user-daily` (10) cache-missing lookups per UTC day, kept in memory (a restart resetting it is acceptable for a hobby app). Global: the `older` bucket in `api_usage` (8/month on the current credit).
+- When a limit is hit → `429` with code `OLDER_RATE_LIMITED` (per user) or `QUOTA_EXHAUSTED` (global quota, provider disabled, or webz.io balance too low). A webz.io failure → `502 PROVIDER_ERROR`; failures are not cached.
+- Posts with no text are dropped, the same as for stored articles.
+- **Live check (2026-10-18):** the `published:<ms` filter works, since every result was published before the cutoff. **Known issue:** with `sort=crawled`, webz.io pages forward from `ts`, so the first older page shows the *oldest* stories (about 30 days back), not the ones just before the cutoff. Next step: test `sort=published&order=desc` for older-news calls.
 - Older articles have no DB `id`, so archiving them sends the full article details (§6.6).
 - "All" view: older news is loaded **one category at a time**. The UI asks the user to choose a category chip first, which avoids spending N calls per tap.
 
@@ -231,7 +235,7 @@ CREATE TABLE archived_articles (
   image_url     TEXT,
   source        VARCHAR(200),
   published_at  TIMESTAMPTZ,
-  category_name VARCHAR(60),
+  category      VARCHAR(60),   -- slug; renamed from category_name in V4
   archived_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
   UNIQUE (user_id, url_hash)
 );
@@ -317,6 +321,8 @@ JWT: HS256, claims `sub` = user id and `exp` = 7 days. There are no refresh toke
 |---|---|---|
 | `GET /archive?cursor=&size=` | | `200 {items:[{id,url,title,summary,imageUrl,source,publishedAt,category,archivedAt}], nextCursor}` |
 | `POST /archive` | `{url, title, summary?, imageUrl?, source?, publishedAt?, category?}` | `201 {item}`, or `200 {item}` if it was already archived (idempotent) |
+
+Archive items: `{id, url, title, summary, imageUrl, source, publishedAt, category, archivedAt}`. `category` is a slug, as in feed items, and is `null` if unknown. Summaries are whitespace-flattened and trimmed to 500 chars, and a non-http(s) `imageUrl` is dropped. Deleting another user's item returns `404`, the same as a missing one.
 | `DELETE /archive/{id}` | | `204`; `404` if the item isn't the user's |
 
 The server recomputes `url_hash` and never trusts a client hash. Field lengths are validated, and `url` must be http(s).

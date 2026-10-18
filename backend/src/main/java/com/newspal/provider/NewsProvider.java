@@ -23,4 +23,12 @@ public interface NewsProvider {
 	 */
 	List<ProviderArticle> fetchLatest(String query, Instant since);
 
+	/**
+	 * Fetch one page of articles published before {@code before} and not earlier than
+	 * {@code notBefore} (SPEC §5).
+	 * @param cursor {@code null} for the first page, else a previous page's
+	 * {@link ProviderPage#nextCursor()}
+	 */
+	ProviderPage fetchOlder(String query, Instant before, Instant notBefore, String cursor);
+
 }

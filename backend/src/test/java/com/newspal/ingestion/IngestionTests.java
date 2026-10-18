@@ -12,15 +12,14 @@ import com.newspal.category.Category;
 import com.newspal.category.CategoryRepository;
 import com.newspal.ingestion.QuotaService.Bucket;
 import com.newspal.provider.ProviderArticle;
+import com.newspal.support.FakeNewsProvider;
+import com.newspal.support.FakeProviderConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -29,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Ingestion, quota and cleanup against a real Postgres with a fake provider.
  */
-@Import({ TestcontainersConfiguration.class, IngestionTests.FakeProviderConfig.class })
+@Import({ TestcontainersConfiguration.class, FakeProviderConfig.class })
 @SpringBootTest
 @ActiveProfiles("test")
 class IngestionTests {
@@ -203,15 +202,5 @@ class IngestionTests {
 		return Instant.now().minus(minutes, ChronoUnit.MINUTES);
 	}
 
-	@TestConfiguration(proxyBeanMethods = false)
-	static class FakeProviderConfig {
-
-		@Bean
-		@Primary
-		FakeNewsProvider fakeNewsProvider() {
-			return new FakeNewsProvider();
-		}
-
-	}
 
 }

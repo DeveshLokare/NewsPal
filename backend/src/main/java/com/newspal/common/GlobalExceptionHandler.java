@@ -12,6 +12,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -39,6 +40,13 @@ public class GlobalExceptionHandler {
 	ResponseEntity<ApiError> handleUnreadable(HttpMessageNotReadableException ex) {
 		return ResponseEntity.badRequest()
 			.body(ApiError.of(ErrorCodes.VALIDATION_FAILED, "Request body is missing or malformed"));
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+		return ResponseEntity.badRequest()
+			.body(new ApiError(ErrorCodes.VALIDATION_FAILED, "Request is invalid",
+					List.of(new ApiError.FieldError(ex.getName(), "has an invalid value"))));
 	}
 
 	@ExceptionHandler(NoResourceFoundException.class)

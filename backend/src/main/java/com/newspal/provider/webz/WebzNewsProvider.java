@@ -9,10 +9,12 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import com.newspal.provider.NewsProvider;
 import com.newspal.provider.ProviderArticle;
 import com.newspal.provider.ProviderException;
+import com.newspal.provider.ProviderPage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,10 +92,37 @@ public class WebzNewsProvider implements NewsProvider {
 		if (since != null) {
 			variables.put("ts", since.toEpochMilli());
 		}
+		WebzResponseParser.Result result = call((builder) -> buildUri(builder, variables), query);
+		return result.articles();
+	}
+
+	@Override
+	public ProviderPage fetchOlder(String query, Instant before, Instant notBefore, String cursor) {
+		WebzResponseParser.Result result;
+		if (cursor != null) {
+			// webz.io's own "next" path: already encoded and carrying the token.
+			if (!cursor.startsWith(this.properties.endpoint() + "?")) {
+				throw new ProviderException("Unexpected webz.io next path");
+			}
+			URI next = URI.create(this.properties.baseUrl() + cursor);
+			result = call((builder) -> next, query);
+		}
+		else {
+			Map<String, Object> variables = new HashMap<>();
+			variables.put("token", this.properties.token());
+			variables.put("q", query + " published:<" + before.toEpochMilli());
+			// The default search window is 3 days; ts widens it back to notBefore.
+			variables.put("ts", notBefore.toEpochMilli());
+			result = call((builder) -> buildUri(builder, variables), query);
+		}
+		return new ProviderPage(result.articles(), result.hasMore() ? result.next() : null);
+	}
+
+	private WebzResponseParser.Result call(Function<UriBuilder, URI> uri, String query) {
 		String body;
 		try {
 			throttle();
-			body = this.restClient.get().uri((builder) -> buildUri(builder, variables)).retrieve().body(String.class);
+			body = this.restClient.get().uri(uri).retrieve().body(String.class);
 		}
 		catch (RestClientResponseException ex) {
 			// Never propagate the original message: it contains the request URL and token.
@@ -106,13 +135,13 @@ public class WebzNewsProvider implements NewsProvider {
 		logger.info("webz.io returned {} articles for [{}]; balance: {}", result.articles().size(), query,
 				result.remaining());
 		recordBalance(result.remaining());
-		return result.articles();
+		return result;
 	}
 
 	/**
 	 * webz.io answers HTTP 429 to calls made in quick succession, so calls from all
-	 * threads are spaced at least {@code min-interval} apart. Refreshes run in the
-	 * background, so waiting here never delays a user request.
+	 * threads are spaced at least {@code min-interval} apart. This can add up to that
+	 * interval to an older-news request; refreshes run in the background.
 	 */
 	private void throttle() {
 		synchronized (this.throttleLock) {

@@ -16,10 +16,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class ArticleStore {
 
-	private static final int TITLE_MAX = 1000;
-
-	private static final int SOURCE_MAX = 200;
-
 	private final JdbcClient jdbc;
 
 	public ArticleStore(JdbcClient jdbc) {
@@ -41,10 +37,9 @@ public class ArticleStore {
 	 */
 	public int insertNew(short categoryId, List<ProviderArticle> articles, int summaryMaxChars) {
 		int inserted = 0;
-		for (ProviderArticle article : articles) {
-			String summary = collapseWhitespace(article.summary());
-			// Posts without any text are videos, social posts or listings, not articles.
-			if (!UrlUtils.isHttpUrl(article.url()) || summary == null) {
+		for (ProviderArticle raw : articles) {
+			ProviderArticle article = ArticleCleaner.clean(raw, summaryMaxChars);
+			if (article == null) {
 				continue;
 			}
 			inserted += this.jdbc.sql("""
@@ -52,11 +47,11 @@ public class ArticleStore {
 					VALUES (:hash, :url, :title, :summary, :image, :source, :published, :category)
 					ON CONFLICT (url_hash) DO NOTHING""")
 				.param("hash", UrlUtils.hash(article.url()))
-				.param("url", article.url().trim())
-				.param("title", truncate(article.title(), TITLE_MAX))
-				.param("summary", truncate(summary, summaryMaxChars))
-				.param("image", (article.imageUrl() != null && UrlUtils.isHttpUrl(article.imageUrl())) ? article.imageUrl() : null)
-				.param("source", truncate(article.source(), SOURCE_MAX))
+				.param("url", article.url())
+				.param("title", article.title())
+				.param("summary", article.summary())
+				.param("image", article.imageUrl())
+				.param("source", article.source())
 				.param("published", Timestamp.from(article.publishedAt()))
 				.param("category", categoryId)
 				.update();
@@ -76,32 +71,6 @@ public class ArticleStore {
 				  SELECT id, row_number() OVER (PARTITION BY category_id ORDER BY published_at DESC, id DESC) AS rn
 				  FROM articles) r
 				WHERE a.id = r.id AND r.rn > ?""").param(max).update();
-	}
-
-	/** Snippets often contain line breaks and runs of spaces; flatten them for display. */
-	static String collapseWhitespace(String text) {
-		if (text == null) {
-			return null;
-		}
-		String collapsed = text.replaceAll("\\s+", " ").strip();
-		return collapsed.isEmpty() ? null : collapsed;
-	}
-
-	/**
-	 * Shortens text to at most {@code max} characters, ending with an ellipsis at a
-	 * word boundary when cut.
-	 */
-	static String truncate(String text, int max) {
-		if (text == null || text.length() <= max) {
-			return text;
-		}
-		String cut = text.substring(0, max - 1);
-		boolean endsOnWord = Character.isWhitespace(text.charAt(max - 1));
-		int space = cut.lastIndexOf(' ');
-		if (!endsOnWord && space > max / 2) {
-			cut = cut.substring(0, space);
-		}
-		return cut.stripTrailing() + "…";
 	}
 
 }

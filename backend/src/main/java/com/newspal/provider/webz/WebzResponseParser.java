@@ -38,7 +38,8 @@ public class WebzResponseParser {
 		String next = text(root, "next");
 		// /api/news reports "balance"; other webz.io APIs use requests_left / requestsLeft.
 		Double remaining = number(root, "balance", "requests_left", "requestsLeft");
-		return new Result(articles, next, remaining);
+		Double more = number(root, "more_results_available", "moreResultsAvailable");
+		return new Result(articles, next, remaining, more);
 	}
 
 	private static ProviderArticle toArticle(JsonNode post) {
@@ -90,7 +91,15 @@ public class WebzResponseParser {
 		}
 	}
 
-	public record Result(List<ProviderArticle> articles, String next, Double remaining) {
+	/**
+	 * @param moreResultsAvailable how many matches remain after this page, if reported
+	 */
+	public record Result(List<ProviderArticle> articles, String next, Double remaining, Double moreResultsAvailable) {
+
+		/** Whether following {@code next} can return anything. */
+		public boolean hasMore() {
+			return this.next != null && (this.moreResultsAvailable == null || this.moreResultsAvailable > 0);
+		}
 	}
 
 }
