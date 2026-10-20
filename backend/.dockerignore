@@ -1,0 +1,8 @@
+target/
+.idea/
+.vscode/
+*.iml
+*.dump
+scripts/
+docker-compose.yml
+run-dev.cmd

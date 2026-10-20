@@ -1,3 +1,10 @@
+server:
+  # Render tells the service which port to listen on.
+  port: ${PORT:8080}
+  # Render terminates HTTPS in front of the app.
+  forward-headers-strategy: framework
+  shutdown: graceful
+
 spring:
   application:
     name: newspal

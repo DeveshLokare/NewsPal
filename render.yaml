@@ -1,0 +1,31 @@
+# Render Blueprint for the NewsPal backend (SPEC §9.4). See DEPLOY.md.
+# The database is on Neon, not Render; its connection details are entered in
+# Render's dashboard when the Blueprint is created (sync: false = prompt, never
+# stored in this file).
+services:
+  - type: web
+    name: newspal-api
+    runtime: docker
+    plan: free
+    # Same region as the Neon database (Neon: AWS Asia Pacific / Singapore).
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /actuator/health
+    autoDeploy: true
+    # Only redeploy when the backend changes, not the Flutter app or docs.
+    buildFilter:
+      paths:
+        - backend/**
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: WEBZ_TOKEN
+        sync: false
+      # Render generates a random secret once; it never appears in git.
+      - key: JWT_SECRET
+        generateValue: true
