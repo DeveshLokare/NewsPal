@@ -7,7 +7,8 @@ plugins {
 android {
     namespace = "com.newspal.newspal"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // The NDK installed via Android Studio (newer than Flutter's default 28.2).
+    ndkVersion = "30.0.16248370"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
