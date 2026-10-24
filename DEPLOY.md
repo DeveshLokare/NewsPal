@@ -97,10 +97,10 @@ The release build is signed with Flutter's debug key, which is fine for your own
 
 Render's free plan sleeps, so a GitHub Actions workflow (`.github/workflows/jobs.yml`) wakes the API every 2 hours. Each run refreshes every news category and, once a day, deletes articles older than 7 days. It needs one shared secret, `JOB_TOKEN`, set in two places.
 
-1. Make a random token. In PowerShell:
+1. Make a random token (48 hex characters). In PowerShell:
 
    ```powershell
-   -join ((48..57) + (97..122) | Get-Random -Count 40 | ForEach-Object {[char]$_})
+   $b = New-Object byte[] 24; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); ($b | ForEach-Object { $_.ToString('x2') }) -join ''
    ```
 
 2. **Render:** on the `newspal-api` service, open **Environment**, add `JOB_TOKEN` with that value, then **Save changes**. Render redeploys.
