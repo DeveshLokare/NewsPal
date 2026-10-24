@@ -69,6 +69,8 @@ public class SecurityConfig {
 			.authorizeHttpRequests((auth) -> auth
 				.requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
+				// Guarded by its own X-Job-Token header instead (JobController).
+				.requestMatchers(HttpMethod.POST, "/api/internal/jobs/run").permitAll()
 				.requestMatchers("/actuator/health", "/error").permitAll()
 				.anyRequest().authenticated())
 			.oauth2ResourceServer((oauth) -> oauth.jwt(Customizer.withDefaults()).authenticationEntryPoint(entryPoint))

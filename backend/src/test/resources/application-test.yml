@@ -3,6 +3,8 @@ newspal:
     secret: test-secret-that-is-at-least-32-bytes-long
   freenews:
     api-key: ""
+  jobs:
+    token: test-job-token
   scheduling:
     # Tests drive ingestion and cleanup directly.
     enabled: false

@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.newspal.provider.NewsProvider;
@@ -50,6 +52,9 @@ public class FakeNewsProvider implements NewsProvider {
 	/** {@link #listLatest} calls from this 0-based index on fail. */
 	public volatile int failLatestFrom = Integer.MAX_VALUE;
 
+	/** When set, {@link #listLatest} waits for it (up to 10 s) before answering. */
+	public volatile CountDownLatch latestGate;
+
 	/** Details calls for these ids fail. */
 	public final Set<String> failingDetails = ConcurrentHashMap.newKeySet();
 
@@ -75,6 +80,7 @@ public class FakeNewsProvider implements NewsProvider {
 		this.enabled = true;
 		this.fail = false;
 		this.failLatestFrom = Integer.MAX_VALUE;
+		this.latestGate = null;
 		this.failingDetails.clear();
 		this.nextResult = List.of();
 		this.latestPages = List.of();
@@ -88,7 +94,20 @@ public class FakeNewsProvider implements NewsProvider {
 	}
 
 	@Override
-	public synchronized ProviderRefPage listLatest(String topic, Instant since, String cursor) {
+	public ProviderRefPage listLatest(String topic, Instant since, String cursor) {
+		CountDownLatch gate = this.latestGate;
+		if (gate != null) {
+			try {
+				gate.await(10, TimeUnit.SECONDS);
+			}
+			catch (InterruptedException ex) {
+				Thread.currentThread().interrupt();
+			}
+		}
+		return listLatestNow(topic, cursor);
+	}
+
+	private synchronized ProviderRefPage listLatestNow(String topic, String cursor) {
 		int index = this.calls.getAndIncrement();
 		this.queries.add(topic);
 		this.latestCursors.add(cursor);
