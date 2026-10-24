@@ -1,8 +1,8 @@
 newspal:
   jwt:
     secret: test-secret-that-is-at-least-32-bytes-long
-  webz:
-    token: ""
+  freenews:
+    api-key: ""
   scheduling:
     # Tests drive ingestion and cleanup directly.
     enabled: false

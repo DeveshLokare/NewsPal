@@ -24,7 +24,7 @@ services:
         sync: false
       - key: SPRING_DATASOURCE_PASSWORD
         sync: false
-      - key: WEBZ_TOKEN
+      - key: FREENEWS_API_KEY
         sync: false
       # Render generates a random secret once; it never appears in git.
       - key: JWT_SECRET

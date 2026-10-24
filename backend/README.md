@@ -36,9 +36,9 @@ The tests start a throwaway Postgres 16 in Docker (Testcontainers), so Docker mu
 | `SPRING_DATASOURCE_USERNAME` | DB user | `newspal` |
 | `SPRING_DATASOURCE_PASSWORD` | DB password | `newspal` |
 | `JWT_SECRET` | HS256 signing secret, at least 32 bytes | none, required |
-| `WEBZ_TOKEN` | webz.io API token. If empty, no news is fetched and no quota is used | empty |
+| `FREENEWS_API_KEY` | Free News API key. If empty, no news is fetched and no quota is used | empty |
 
-Other news settings (`refresh-ttl`, `retention`, quotas, webz.io endpoint) are under `newspal.news` and `newspal.webz` in `application.yml`.
+Other news settings (`refresh-ttl`, `retention`, daily quotas, language/country) are under `newspal.news` and `newspal.freenews` in `application.yml`.
 
 ## Endpoints so far
 
@@ -49,7 +49,7 @@ Other news settings (`refresh-ttl`, `retention`, quotas, webz.io endpoint) are u
 - `GET /api/me/categories` → `200 ["technology", ...]`
 - `PUT /api/me/categories` `["technology","sports"]` → `204`
 - `GET /api/feed?category=&cursor=&size=` → `200 {items, nextCursor, lastRefreshedAt}` (stored articles, newest first)
-- `GET /api/feed/older?category=&cursor=` → `200 {items, nextCursor}` (live from webz.io, cached 1 h, not stored)
+- `GET /api/feed/older?category=&cursor=` → `200 {items, nextCursor}` (live from Free News API, cached 1 h, not stored)
 - `GET /api/archive?cursor=&size=` → `200 {items, nextCursor}`
 - `POST /api/archive` `{url, title, summary?, imageUrl?, source?, publishedAt?, category?}` → `201` new / `200` existing
 - `DELETE /api/archive/{id}` → `204`
@@ -57,14 +57,6 @@ Other news settings (`refresh-ttl`, `retention`, quotas, webz.io endpoint) are u
 
 ## Background jobs
 
-- On startup, then every hour: refresh stale categories that someone follows (at most one webz.io call per category per `refresh-ttl`).
-- Every hour at :15 (UTC): delete articles older than 7 days and keep at most 200 per category.
-- The monthly call count is stored in the `api_usage` table. Fetching also pauses for the month once webz.io reports a balance below 0.30.
-
-## Checking category queries against webz.io
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\check-webz-queries.ps1 [-Only sports] [-Size 10]
-```
-
-The script asks for the token without echoing it, makes one call per category (each costs credit), and writes a summary to `target/webz-check.json`.
+- On startup, then every hour: refresh stale categories that someone follows (each about every 2 h, `refresh-ttl`). A refresh lists up to 3 pages of new articles for the category's topic, then makes one `/details` call per article not stored yet.
+- Every hour at :15 (UTC): delete articles older than 7 days and keep at most 1000 per category.
+- Every provider call is counted per UTC day in the `api_usage` table (3,600 for refreshes, 1,000 for older news; the API allows 5,000/day). Fetching also pauses until the daily reset once Free News API reports fewer than 100 requests left, or says the quota is used up.

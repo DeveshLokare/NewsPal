@@ -1,7 +1,7 @@
 package com.newspal.ingestion;
 
 import java.time.Clock;
-import java.time.YearMonth;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 
 import com.newspal.config.NewsProperties;
@@ -10,8 +10,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
 /**
- * Monthly webz.io call budget, stored in {@code api_usage} so it survives restarts
- * (SPEC §4.2, §6.2).
+ * Daily news-provider call budget, stored in {@code api_usage} so it survives restarts
+ * (SPEC-v2 §4.5). Every provider call counts, list or details.
  */
 @Service
 public class QuotaService {
@@ -41,21 +41,34 @@ public class QuotaService {
 	}
 
 	/**
-	 * Counts one call against {@code bucket} if this month's limit allows it.
+	 * Counts one call against {@code bucket} if today's limit allows it.
 	 * @return {@code true} if the call may be made
 	 */
 	public boolean tryAcquire(Bucket bucket) {
+		return tryAcquire(bucket, 1);
+	}
+
+	/**
+	 * Counts {@code calls} calls against {@code bucket}, all or none, if today's limit
+	 * allows them.
+	 * @return {@code true} if the calls may be made
+	 */
+	public boolean tryAcquire(Bucket bucket, int calls) {
 		int limit = limit(bucket);
-		if (limit <= 0) {
+		if (calls <= 0) {
+			return true;
+		}
+		if (calls > limit) {
 			return false;
 		}
 		return !this.jdbc.sql("""
-				INSERT INTO api_usage (month, bucket, calls) VALUES (:month, :bucket, 1)
-				ON CONFLICT (month, bucket) DO UPDATE SET calls = api_usage.calls + 1
-				WHERE api_usage.calls < :limit
+				INSERT INTO api_usage (period, bucket, calls) VALUES (:period, :bucket, :calls)
+				ON CONFLICT (period, bucket) DO UPDATE SET calls = api_usage.calls + :calls
+				WHERE api_usage.calls + :calls <= :limit
 				RETURNING calls""")
-			.param("month", currentMonth())
+			.param("period", currentPeriod())
 			.param("bucket", bucket.column)
+			.param("calls", calls)
 			.param("limit", limit)
 			.query(Integer.class)
 			.list()
@@ -63,8 +76,8 @@ public class QuotaService {
 	}
 
 	public int used(Bucket bucket) {
-		return this.jdbc.sql("SELECT calls FROM api_usage WHERE month = ? AND bucket = ?")
-			.params(currentMonth(), bucket.column)
+		return this.jdbc.sql("SELECT calls FROM api_usage WHERE period = ? AND bucket = ?")
+			.params(currentPeriod(), bucket.column)
 			.query(Integer.class)
 			.optional()
 			.orElse(0);
@@ -72,13 +85,14 @@ public class QuotaService {
 
 	private int limit(Bucket bucket) {
 		return switch (bucket) {
-			case INGESTION -> this.properties.quota().ingestionMonthly();
-			case OLDER -> this.properties.quota().olderMonthly();
+			case INGESTION -> this.properties.quota().ingestionDaily();
+			case OLDER -> this.properties.quota().olderDaily();
 		};
 	}
 
-	String currentMonth() {
-		return YearMonth.from(this.clock.instant().atZone(ZoneOffset.UTC)).toString();
+	/** Today's {@code api_usage.period}, e.g. {@code 2026-10-24} (UTC). */
+	String currentPeriod() {
+		return LocalDate.ofInstant(this.clock.instant(), ZoneOffset.UTC).toString();
 	}
 
 }

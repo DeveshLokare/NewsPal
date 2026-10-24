@@ -1,34 +1,42 @@
 package com.newspal.provider;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.Optional;
 
 /**
- * Source of news articles (SPEC §8.2). Implementations must not retry on their own;
- * the next lazy refresh acts as the retry.
+ * Source of news articles (SPEC-v2 §4.4). Each method is exactly one provider call,
+ * so callers can count every call against the quota. Implementations must not retry
+ * on their own, except briefly for a rate-limit response; the next refresh acts as
+ * the retry.
  */
 public interface NewsProvider {
 
 	/**
-	 * Whether the provider is configured (for example, an API token is present). When
-	 * {@code false}, ingestion is skipped without spending quota.
+	 * Whether the provider can be called: an API key is configured and the provider
+	 * hasn't paused itself (quota used up, key rejected). When {@code false}, callers
+	 * skip it without spending quota.
 	 */
 	boolean isEnabled();
 
 	/**
-	 * Fetch the newest articles matching {@code query}.
-	 * @param query the provider-specific query stored on the category
-	 * @param since only articles newer than this, or {@code null} for the provider's
-	 * default window
+	 * One page of the newest article refs for {@code topic}, newest first.
+	 * @param since only articles published at or after this, or {@code null} for no
+	 * lower bound
+	 * @param cursor {@code null} for the first page, else a previous page's
+	 * {@link ProviderRefPage#nextCursor()}
 	 */
-	List<ProviderArticle> fetchLatest(String query, Instant since);
+	ProviderRefPage listLatest(String topic, Instant since, String cursor);
 
 	/**
-	 * Fetch one page of articles published before {@code before} and not earlier than
-	 * {@code notBefore} (SPEC §5).
-	 * @param cursor {@code null} for the first page, else a previous page's
-	 * {@link ProviderPage#nextCursor()}
+	 * One page of article refs published before {@code before} and not earlier than
+	 * {@code notBefore}, newest first (SPEC §5).
 	 */
-	ProviderPage fetchOlder(String query, Instant before, Instant notBefore, String cursor);
+	ProviderRefPage listOlder(String topic, Instant before, Instant notBefore, String cursor);
+
+	/**
+	 * The full article for a ref, or empty if the provider no longer has it or it has
+	 * no usable URL.
+	 */
+	Optional<ProviderArticle> details(String providerId);
 
 }

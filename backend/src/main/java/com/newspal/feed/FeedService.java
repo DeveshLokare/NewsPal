@@ -44,7 +44,7 @@ public class FeedService {
 			return new FeedPage(List.of(), null, null);
 		}
 		if (after == null) {
-			// First page: refresh stale categories in the background; never wait for webz.io.
+			// First page: refresh stale categories in the background; never wait for the provider.
 			this.ingestion.refreshStaleAsync(selected);
 		}
 		List<ArticleDto> rows = this.feed.page(userId, selected.stream().map(Category::id).toList(), after, size + 1);

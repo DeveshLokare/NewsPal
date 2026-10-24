@@ -4,8 +4,8 @@ import java.util.List;
 
 import com.jayway.jsonpath.JsonPath;
 import com.newspal.TestcontainersConfiguration;
-import com.newspal.provider.ProviderPage;
 import com.newspal.support.FakeNewsProvider;
+import com.newspal.support.FakeNewsProvider.Page;
 import com.newspal.support.FakeProviderConfig;
 import com.newspal.support.TestUsers;
 import org.junit.jupiter.api.Test;
@@ -48,9 +48,9 @@ class OlderNewsLimitTests {
 		String bearer = TestUsers.register(this.mvc, "limit@example.com");
 		TestUsers.follow(this.mvc, bearer, "technology");
 		this.provider.olderPages = List.of(
-				new ProviderPage(List.of(OlderNewsTests.article("https://example.com/a")), "/api/news?from=10"),
-				new ProviderPage(List.of(OlderNewsTests.article("https://example.com/b")), "/api/news?from=20"),
-				new ProviderPage(List.of(OlderNewsTests.article("https://example.com/c")), null));
+				new Page(List.of(OlderNewsTests.article("https://example.com/a")), "/api/news?from=10"),
+				new Page(List.of(OlderNewsTests.article("https://example.com/b")), "/api/news?from=20"),
+				new Page(List.of(OlderNewsTests.article("https://example.com/c")), null));
 
 		String cursor = nextCursor(bearer, null);
 		cursor = nextCursor(bearer, cursor);
