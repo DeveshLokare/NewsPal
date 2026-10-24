@@ -7,6 +7,7 @@ import '../../app/theme.dart';
 import '../../core/api_error.dart';
 import '../../core/time_format.dart';
 import '../../widgets/brand_wordmark.dart';
+import '../auth/security_question_banner.dart';
 import '../categories/category_repository.dart';
 import 'article_card.dart';
 import 'feed_controller.dart';
@@ -33,9 +34,22 @@ class FeedPage extends ConsumerWidget {
     final effective = followed.any((c) => c.slug == selected) ? selected : null;
     final names = {for (final c in followed) c.slug: c.name};
     return Scaffold(
-      appBar: AppBar(title: const BrandWordmark(size: 22), titleSpacing: 16),
+      appBar: AppBar(
+        title: const BrandWordmark(size: 22),
+        titleSpacing: 16,
+        actions: [
+          IconButton(
+            key: const ValueKey('open-search'),
+            tooltip: 'Search',
+            icon: const Icon(Icons.search),
+            onPressed: () => context.push(Routes.search),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
       body: Column(
         children: [
+          const SecurityQuestionBanner(),
           _CategoryChips(categories: followed, selected: effective),
           Expanded(child: FeedList(key: ValueKey(effective), category: effective, categoryNames: names)),
         ],

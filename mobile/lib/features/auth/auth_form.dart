@@ -64,13 +64,13 @@ class FormErrorText extends StatelessWidget {
   }
 }
 
-/// Submit button that shows a spinner while [busy].
+/// Submit button that shows a spinner while [busy]; a null [onPressed] disables it.
 class SubmitButton extends StatelessWidget {
   const SubmitButton({super.key, required this.label, required this.busy, required this.onPressed});
 
   final String label;
   final bool busy;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
