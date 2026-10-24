@@ -4,11 +4,11 @@ How the pieces fit once deployed:
 
 ```
 Phone (NewsPal app) ──HTTPS──▶ Render: newspal-api (Docker, free, Singapore)
-                                   │            └──▶ Free News API (news, ≤ 4,600 calls/day)
-                                   └──▶ Neon: Postgres 16 (free, Singapore)
+GitHub Actions ──every 2 h──▶      │            └──▶ Free News API (news, ≤ 4,600 calls/day)
+  (wakes it, starts the jobs)      └──▶ Neon: Postgres 16 (free, Singapore)
 ```
 
-Everything in this repo is ready: `backend/Dockerfile`, `render.yaml` (Render Blueprint) and the production settings in `backend/src/main/resources/application.yml`. The steps below are the parts that need your accounts. Plan on about 30 minutes, most of it waiting for the first build.
+Everything in this repo is ready: `backend/Dockerfile`, `render.yaml` (Render Blueprint), `.github/workflows/jobs.yml` and the production settings in `backend/src/main/resources/application.yml`. The steps below are the parts that need your accounts. Plan on about 30 minutes, most of it waiting for the first build.
 
 ---
 
@@ -71,7 +71,7 @@ Later pushes to `main` that change anything under `backend/` redeploy automatica
 
 ## 5. Run the app on your Android phone
 
-This needs the Android SDK, which isn't installed on this PC yet.
+This needs the Android SDK (installed on this PC since v0.1; on a new PC, do steps 1–2 first).
 
 1. Install **Android Studio** from https://developer.android.com/studio (default options), open it once, and let it install the SDK.
 2. Accept the Android licenses:
@@ -92,6 +92,8 @@ C:\src\flutter\bin\flutter.bat build apk --release --dart-define=API_BASE_URL=ht
    - **No cable:** copy the APK to the phone and open it (allow "install unknown apps" for your file manager).
 
 The release build is signed with Flutter's debug key, which is fine for your own phone. Publishing to the Play Store would need a real signing key; that's not covered here.
+
+**Updating to a new version** (e.g. v0.1 → v0.2): build and install the new APK the same way. It installs over the old one and you stay signed in, as long as it's built on the same PC: the debug key lives in `%USERPROFILE%\.android\debug.keystore`. An APK built elsewhere has a different key, so Android refuses the update; uninstall the old app first (you'll need to log in again).
 
 ## 6. Schedule the background jobs (GitHub Actions)
 

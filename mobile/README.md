@@ -37,12 +37,16 @@ lib/
   core/       api_client.dart (dio + auth header + 401 sign-out), api_error.dart, token_store.dart, env.dart,
               link_rules.dart (which links leave the app), time_format.dart
   features/
-    auth/        auth_controller.dart (session state), auth_repository.dart, login/register pages
+    auth/        auth_controller.dart (session state), auth_repository.dart, login/register pages,
+                 security_question_fields.dart (picker + answer), security_question_banner.dart (Feed reminder),
+                 password_reset_controller.dart + forgot_password_pages.dart (forgot password, 2 screens)
     categories/  category_repository.dart, category_picker_page.dart (onboarding + settings)
     feed/        feed_page.dart (chips, pull-to-refresh, infinite scroll, older news), feed_controller.dart
                  (paging: stored → older), article_page.dart (WebView on phones; reading card on web)
     archive/     archive_repository.dart, bookmarks.dart (shared bookmark state + BookmarkButton),
                  archive_controller.dart (paging, remove/undo), archive_page.dart (swipe-to-delete)
-    settings/    settings_page.dart
+    search/      search_repository.dart, search_controller.dart (debounce, stale answers dropped, recent),
+                 search_page.dart (all categories, feed cards, infinite scroll)
+    settings/    settings_page.dart (+ logout confirmation), security_question_page.dart
   widgets/    brand_wordmark.dart, coming_soon.dart
 ```
