@@ -43,9 +43,13 @@ Other news settings (`refresh-ttl`, `retention`, daily quotas, language/country)
 
 ## Endpoints so far
 
-- `POST /api/auth/register` `{email, password}` → `201 {token, expiresAt, user}`
+- `POST /api/auth/register` `{email, password, questionId?, answer?}` → `201 {token, expiresAt, user}` (question and answer go together; optional until the app sends them)
 - `POST /api/auth/login` `{email, password}` → `200 {token, expiresAt, user}`
-- `GET /api/me` (Bearer token) → `200 {id, email}`
+- `GET /api/auth/security-questions` → `200 [{id, text}]`
+- `POST /api/auth/password/question` `{email}` → `200 {questionId, text}` (a stable decoy for unknown emails)
+- `POST /api/auth/password/reset` `{email, answer, newPassword}` → `200 {token, expiresAt, user}`; `400 WRONG_ANSWER {attemptsLeft}`; `429 RESET_LOCKED {retryAfterSeconds}` after 5 wrong answers (24 h). Signs out the account's older tokens
+- `GET /api/me` (Bearer token) → `200 {id, email, hasSecurityQuestion}`
+- `PUT /api/me/security-question` `{currentPassword, questionId, answer}` → `204`; `400 WRONG_PASSWORD`
 - `GET /api/categories` (public) → `200 [{slug, name}]`
 - `GET /api/me/categories` → `200 ["technology", ...]`
 - `PUT /api/me/categories` `["technology","sports"]` → `204`

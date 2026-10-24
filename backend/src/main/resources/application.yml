@@ -75,6 +75,12 @@ newspal:
     min-interval: PT0.55S
     # Pause until the daily reset when the API reports fewer requests left than this.
     min-remaining: 100
+  reset:
+    # Password reset with a security question (SPEC-v2 §7.4).
+    max-attempts: 5
+    lockout: P1D
+    hourly-per-ip: 20
+    answer-min-chars: 3
   jobs:
     # Shared with the GitHub Actions workflow that calls POST /api/internal/jobs/run
     # every 2 hours (.github/workflows/jobs.yml). Empty disables that endpoint.

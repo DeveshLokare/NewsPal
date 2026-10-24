@@ -7,6 +7,7 @@ import java.util.List;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import com.newspal.auth.PasswordChangeValidator;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -22,6 +23,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -67,8 +69,10 @@ public class SecurityConfig {
 			.formLogin(AbstractHttpConfigurer::disable)
 			.sessionManagement((session) -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests((auth) -> auth
-				.requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
-				.requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/password/question",
+						"/api/auth/password/reset")
+				.permitAll()
+				.requestMatchers(HttpMethod.GET, "/api/categories", "/api/auth/security-questions").permitAll()
 				// Guarded by its own X-Job-Token header instead (JobController).
 				.requestMatchers(HttpMethod.POST, "/api/internal/jobs/run").permitAll()
 				.requestMatchers("/actuator/health", "/error").permitAll()
@@ -89,9 +93,11 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	JwtDecoder jwtDecoder(SecretKey jwtSigningKey) {
+	JwtDecoder jwtDecoder(SecretKey jwtSigningKey, PasswordChangeValidator passwordChanges) {
 		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSigningKey).macAlgorithm(MacAlgorithm.HS256).build();
-		decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(ISSUER));
+		// Tokens issued before a password reset are rejected (SPEC-v2 §7.4).
+		decoder.setJwtValidator(
+				new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefaultWithIssuer(ISSUER), passwordChanges));
 		return decoder;
 	}
 

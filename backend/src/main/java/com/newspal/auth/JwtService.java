@@ -31,15 +31,29 @@ public class JwtService {
 		this.clock = clock;
 	}
 
+	/** Claim holding the account's last password change (epoch millis), if any. */
+	public static final String PASSWORD_CHANGED_CLAIM = "pwc";
+
 	public IssuedToken issue(long userId) {
+		return issue(userId, null);
+	}
+
+	/**
+	 * @param passwordChangedAt the account's last password reset, or {@code null} if
+	 * never; tokens carrying an older value are rejected (PasswordChangeValidator)
+	 */
+	public IssuedToken issue(long userId, Instant passwordChangedAt) {
 		Instant now = this.clock.instant();
 		Instant expiresAt = now.plus(this.properties.ttl());
-		JwtClaimsSet claims = JwtClaimsSet.builder()
+		JwtClaimsSet.Builder builder = JwtClaimsSet.builder()
 			.issuer(SecurityConfig.ISSUER)
 			.subject(Long.toString(userId))
 			.issuedAt(now)
-			.expiresAt(expiresAt)
-			.build();
+			.expiresAt(expiresAt);
+		if (passwordChangedAt != null) {
+			builder.claim(PASSWORD_CHANGED_CLAIM, passwordChangedAt.toEpochMilli());
+		}
+		JwtClaimsSet claims = builder.build();
 		JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
 		String token = this.encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
 		return new IssuedToken(token, expiresAt);
