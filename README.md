@@ -4,7 +4,7 @@ A hobby news app: pick the topics you care about, get the latest stories from th
 
 - **mobile/**: Flutter app (Android, iOS, web for development). See [mobile/README.md](mobile/README.md).
 - **backend/**: Spring Boot 4 / Java 21 API with PostgreSQL. News comes from Free News API (freenewsapi.io). See [backend/README.md](backend/README.md).
-- **SPEC.md**: the full design: features, data model, API, budget and decisions.
+- **SPEC.md**: the full design: features, data model, API, budget and decisions (v0.2). SPEC-v2.md is the historical v0.2 plan.
 - **DEPLOY.md**: how to deploy (Render for the API, Neon for the database) and install the app on a phone.
 
 ## Run it locally

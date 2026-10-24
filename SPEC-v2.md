@@ -1,7 +1,7 @@
 # NewsPal v0.2 — Release Specification
 
-> Status: Draft · 2026-10-24 · Changes on top of [SPEC.md](SPEC.md) (v1). Sections not mentioned here are unchanged.
-> Once v0.2 ships, fold this document into SPEC.md and delete it.
+> Status: **Historical** · the v0.2 plan (2026-10-24), written as changes on top of v0.1.
+> v0.2 shipped and **[SPEC.md](SPEC.md) is now the full, current spec**; read that first. This file is kept because code comments cite its sections ("SPEC-v2 §4.5"). Where the two differ, SPEC.md describes what was built.
 
 ---
 
