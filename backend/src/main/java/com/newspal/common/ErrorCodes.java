@@ -1,7 +1,7 @@
 package com.newspal.common;
 
 /**
- * Error codes from SPEC §7.1.
+ * Error codes from SPEC §7.1 and SPEC-v2 §9.
  */
 public final class ErrorCodes {
 
@@ -16,6 +16,18 @@ public final class ErrorCodes {
 	public static final String NOT_FOUND = "NOT_FOUND";
 
 	public static final String EMAIL_TAKEN = "EMAIL_TAKEN";
+
+	/** Security answer didn't match; the body has {@code attemptsLeft} (SPEC-v2 §7.4). */
+	public static final String WRONG_ANSWER = "WRONG_ANSWER";
+
+	/** Current password didn't match when changing the security question. */
+	public static final String WRONG_PASSWORD = "WRONG_PASSWORD";
+
+	/** Too many wrong answers; the body has {@code retryAfterSeconds}. */
+	public static final String RESET_LOCKED = "RESET_LOCKED";
+
+	/** Too many reset requests from one IP. */
+	public static final String RESET_RATE_LIMITED = "RESET_RATE_LIMITED";
 
 	public static final String OLDER_RATE_LIMITED = "OLDER_RATE_LIMITED";
 

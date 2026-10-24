@@ -245,11 +245,11 @@ Login ──"Forgot password?"──▶ Enter email ──POST /auth/password/qu
 | Method & path | Auth | Body | Response |
 |---|---|---|---|
 | `GET /api/auth/security-questions` | public | — | `200 [{id, text}]`, ordered by `sort_order` |
-| `POST /api/auth/register` (changed) | public | `{email, password, questionId, answer}` | As v1. `questionId` must exist, and `answer` is 3–100 chars after normalising |
+| `POST /api/auth/register` (changed) | public | `{email, password, questionId?, answer?}` | As v1, plus `user.hasSecurityQuestion`. `questionId` and `answer` go together: `questionId` must exist, and `answer` is 3–100 chars after normalising. **Optional until M12 ships** (decided 2026-10-24), so the app already installed can still register; the new app always sends them |
 | `POST /api/auth/password/question` | public | `{email}` | `200 {questionId, text}`. **Always 200**, for unknown emails and accounts without a question too (§7.4). `429 RESET_RATE_LIMITED` if over the IP limit |
 | `POST /api/auth/password/reset` | public | `{email, answer, newPassword}` (8–72 chars) | `200 {token, expiresAt, user}` (same as login). `400 WRONG_ANSWER {attemptsLeft}`. `429 RESET_LOCKED {retryAfterSeconds}` |
 | `GET /api/me` (changed) | JWT | — | `200 {id, email, hasSecurityQuestion}` |
-| `PUT /api/me/security-question` | JWT | `{currentPassword, questionId, answer}` | `204`. `401 BAD_CREDENTIALS` if the password is wrong |
+| `PUT /api/me/security-question` | JWT | `{currentPassword, questionId, answer}` | `204`. `400 WRONG_PASSWORD` if the password is wrong. Not `401`: the app signs out on any `401` from a signed-in call |
 
 ### 7.3 Data model (`V8__security_questions.sql`)
 ```sql
@@ -283,9 +283,9 @@ ALTER TABLE users
 - **Lockout per account:** each wrong answer increments `reset_failed_attempts`. At **5** the account is locked for **24 h** (`reset_locked_until`) and the counter resets. While locked, `/reset` returns `429 RESET_LOCKED` without checking the answer. A successful reset or a normal password login clears the counter.
 - **IP limit:** 20 requests per hour per IP across `/password/question` and `/password/reset` (in-memory Caffeine, using the client IP via `forward-headers-strategy`). Over the limit → `429 RESET_RATE_LIMITED`.
 - **No enumeration:** for an unknown email, or an account with no question set, `/password/question` returns a **decoy**: the question with index `HMAC-SHA256(email, server key) mod N`. The same email always gets the same decoy, so asking twice gives nothing away. `/reset` for those emails always fails with `WRONG_ANSWER` after a dummy BCrypt check, with a decoy lockout counter in memory so it looks and times like a real account. Login already does the same with `dummyHash`.
-- **Sign out other devices (US-16):** `/reset` sets the new password hash and `password_changed_at = now()` in one transaction. A JWT validator added to `SecurityConfig`'s decoder rejects tokens whose `iat` is before `password_changed_at`, with a per-user Caffeine cache (1 min) to avoid a DB hit per request. The token returned by `/reset` is issued after the change, so it stays valid.
+- **Sign out other devices (US-16):** `/reset` sets the new password hash and `password_changed_at` (millisecond precision) in one statement. Every token carries the account's `password_changed_at` as a `pwc` claim (epoch millis; absent if never reset). A JWT validator added to `SecurityConfig`'s decoder rejects a token whose `pwc` is missing or older than the stored value, with a per-user Caffeine cache (1 min) to avoid a DB hit per request; a reset clears its user's entry. Comparing `pwc` rather than `iat` matters because `iat` has whole-second precision, so a token issued in the same second as the reset would otherwise survive it. The token returned by `/reset` carries the new value, so it stays valid.
 - **Changing the question** (`PUT /me/security-question`) needs the current password, so a borrowed unlocked phone can't be used to plant an answer.
-- **New error codes:** `WRONG_ANSWER` (400), `RESET_LOCKED` (429), `RESET_RATE_LIMITED` (429).
+- **New error codes:** `WRONG_ANSWER` (400, body adds `attemptsLeft`), `WRONG_PASSWORD` (400), `RESET_LOCKED` (429, body adds `retryAfterSeconds` and a `Retry-After` header), `RESET_RATE_LIMITED` (429, same).
 - **Config:**
   ```yaml
   newspal:
@@ -363,7 +363,7 @@ New package `search/`: `SearchController`, `SearchService` (`JdbcClient` query w
 | `POST /api/internal/jobs/run` | `X-Job-Token` | New |
 | all JWT endpoints | JWT | Tokens issued before a password reset → `401` |
 
-Error-code table additions: `400 WRONG_ANSWER` · `429 RESET_LOCKED, RESET_RATE_LIMITED, SEARCH_RATE_LIMITED`.
+Error-code table additions: `400 WRONG_ANSWER, WRONG_PASSWORD` · `429 RESET_LOCKED, RESET_RATE_LIMITED, SEARCH_RATE_LIMITED`.
 
 ## 10. Migrations
 | File | Purpose |

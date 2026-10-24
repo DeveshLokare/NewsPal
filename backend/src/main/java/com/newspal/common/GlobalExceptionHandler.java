@@ -1,10 +1,13 @@
 package com.newspal.common;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -20,9 +23,26 @@ public class GlobalExceptionHandler {
 
 	private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+	/** An {@link ApiException} detail that is also sent as a {@code Retry-After} header. */
+	public static final String RETRY_AFTER_SECONDS = "retryAfterSeconds";
+
 	@ExceptionHandler(ApiException.class)
-	ResponseEntity<ApiError> handleApi(ApiException ex) {
-		return ResponseEntity.status(ex.status()).body(ApiError.of(ex.code(), ex.getMessage()));
+	ResponseEntity<Object> handleApi(ApiException ex) {
+		ResponseEntity.BodyBuilder response = ResponseEntity.status(ex.status());
+		if (ex.details().get(RETRY_AFTER_SECONDS) instanceof Number seconds) {
+			response.header(HttpHeaders.RETRY_AFTER, Long.toString(seconds.longValue()));
+		}
+		ApiError error = ApiError.of(ex.code(), ex.getMessage());
+		if (ex.details().isEmpty()) {
+			return response.body(error);
+		}
+		// Same shape as ApiError, plus the extra fields.
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("code", error.code());
+		body.put("message", error.message());
+		body.put("fieldErrors", error.fieldErrors());
+		body.putAll(ex.details());
+		return response.body(body);
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
