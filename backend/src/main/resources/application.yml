@@ -47,7 +47,7 @@ newspal:
     ttl: P7D
   news:
     # Free News API allows 5,000 requests/day; each new article costs a list share plus
-    # one /details call (SPEC-v2 §4.5). Refresh every category about every 2 hours.
+    # one /details call (SPEC-v2 §4.5). Every category is refreshed about every 2 hours.
     refresh-ttl: PT1H50M
     # Must exceed refresh-ttl or feeds empty out between refreshes.
     retention: P7D
@@ -75,5 +75,11 @@ newspal:
     min-interval: PT0.55S
     # Pause until the daily reset when the API reports fewer requests left than this.
     min-remaining: 100
+  jobs:
+    # Shared with the GitHub Actions workflow that calls POST /api/internal/jobs/run
+    # every 2 hours (.github/workflows/jobs.yml). Empty disables that endpoint.
+    token: ${JOB_TOKEN:}
+    # Cleanup runs at most once in this window, whichever trigger gets there first.
+    cleanup-every: PT23H
   scheduling:
     enabled: true

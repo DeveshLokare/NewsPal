@@ -377,8 +377,8 @@ Error-code table additions: `400 WRONG_ANSWER` · `429 RESET_LOCKED, RESET_RATE_
 All are additive or renames; v1 data (users, follows, archives) is kept.
 
 ## 11. Configuration & deployment
-- **Render env vars:** add `FREENEWS_API_KEY`, `JOB_TOKEN` (`generateValue: true` in `render.yaml`). Remove `WEBZ_TOKEN`.
-- **GitHub repo secrets:** `JOB_TOKEN` (same value as Render) and `API_BASE_URL` for `.github/workflows/jobs.yml`. The workflow also has `workflow_dispatch`, for manual runs.
+- **Render env vars:** add `FREENEWS_API_KEY` and `JOB_TOKEN` (`sync: false` in `render.yaml`: the same value must also go into GitHub, so it's generated once and pasted into both). Remove `WEBZ_TOKEN`.
+- **GitHub repo settings:** secret `JOB_TOKEN` (same value as Render) and variable `API_BASE_URL` (not secret) for `.github/workflows/jobs.yml`. The workflow also has `workflow_dispatch`, for manual runs.
 - **DEPLOY.md:** replace the webz.io section with Free News API signup and the GitHub Actions schedule. Update the architecture diagram.
 - **README / SPEC.md:** after release, merge this document into SPEC.md (§1.4, §3.1, §4, §6, §7, §8.2, §9.3, §10–§12).
 

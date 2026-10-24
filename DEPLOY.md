@@ -66,7 +66,7 @@ Later pushes to `main` that change anything under `backend/` redeploy automatica
 ## 4. Check the free-tier behaviour
 
 - **Render** puts the service to sleep after 15 minutes without requests. The next request wakes it in about a minute; the app shows "Waking up the server…" meanwhile.
-- **Neon** suspends the database after 5 minutes without queries. In the Neon dashboard, the compute should show **Idle** a few minutes after you stop using the app. If it never goes idle, check that nothing is pinging the API.
+- **Neon** suspends the database after 5 minutes without queries. In the Neon dashboard, the compute should show **Idle** a few minutes after a job run or after you stop using the app. The jobs workflow (§6) wakes it every 2 hours for a few minutes, which costs about 15 of the 100 free compute-hours a month. If it never goes idle, check that nothing else is pinging the API.
 - **Free News API:** 5,000 requests a day. Refreshes are capped at 3,600 calls a day, plus 1,000 for older news, and fetching pauses until the daily reset if fewer than 100 are left. The logs show `Free News API listed … articles` for each list call.
 
 ## 5. Run the app on your Android phone
@@ -93,6 +93,26 @@ C:\src\flutter\bin\flutter.bat build apk --release --dart-define=API_BASE_URL=ht
 
 The release build is signed with Flutter's debug key, which is fine for your own phone. Publishing to the Play Store would need a real signing key; that's not covered here.
 
+## 6. Schedule the background jobs (GitHub Actions)
+
+Render's free plan sleeps, so a GitHub Actions workflow (`.github/workflows/jobs.yml`) wakes the API every 2 hours. Each run refreshes every news category and, once a day, deletes articles older than 7 days. It needs one shared secret, `JOB_TOKEN`, set in two places.
+
+1. Make a random token. In PowerShell:
+
+   ```powershell
+   -join ((48..57) + (97..122) | Get-Random -Count 40 | ForEach-Object {[char]$_})
+   ```
+
+2. **Render:** on the `newspal-api` service, open **Environment**, add `JOB_TOKEN` with that value, then **Save changes**. Render redeploys.
+3. **GitHub:** in the repository, open **Settings → Secrets and variables → Actions**:
+   - **Secrets** tab → **New repository secret**: name `JOB_TOKEN`, the same value.
+   - **Variables** tab → **New repository variable**: name `API_BASE_URL`, value your service URL, e.g. `https://newspal-api.onrender.com`.
+4. **Actions** tab → **Background jobs** → **Run workflow**. The run should end green with `HTTP 202: {"started":true}` in its log, and Render's logs should show `Refreshed …` lines followed by `Job pass finished`.
+
+After that it runs on its own every 2 hours (GitHub can start scheduled runs a few minutes late). A red run with `404` means the two `JOB_TOKEN` values don't match. GitHub pauses schedules on repositories with no commits for 60 days; if that happens, re-enable the workflow from the Actions tab.
+
+Free-tier cost: Render is awake about 3 hours a day for these runs, well within its 750 free hours a month, and they use at most 3,600 of Free News API's 5,000 daily requests.
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -101,6 +121,7 @@ The release build is signed with Flutter's debug key, which is fine for your own
 | Health check fails, logs show `Connection refused` or `password authentication failed` | Wrong `SPRING_DATASOURCE_*` values. Check the URL starts with `jdbc:postgresql://` and has no `user:password@`. |
 | `FATAL: invalid value for parameter "TimeZone"` | The JVM isn't in UTC. The Dockerfile sets `-Duser.timezone=UTC`; make sure Render builds from `backend/Dockerfile`. |
 | App says "Can't reach NewsPal right now" | Wrong `API_BASE_URL` in the build, or the service is still waking up. Open `/actuator/health` in a browser. |
+| News stops updating while nobody uses the app | The jobs workflow isn't running or failing: check the **Actions** tab (§6). |
 | Feed stays empty | `FREENEWS_API_KEY` is empty or rejected, or the daily budget is used up. The logs show `News provider disabled` or `quota used up`. |
 
 ## Optional: backups

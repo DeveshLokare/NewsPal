@@ -210,15 +210,15 @@ class IngestionTests {
 	}
 
 	@Test
-	void scheduledPassOnlyRefreshesFollowedCategories() {
-		long userId = this.jdbc.sql("INSERT INTO users (email, password_hash) VALUES ('f@example.com', 'x') RETURNING id")
-			.query(Long.class)
-			.single();
-		this.jdbc.sql("INSERT INTO user_categories (user_id, category_id) VALUES (?, ?)")
-			.params(userId, category("entertainment").id())
-			.update();
-		this.ingestion.refreshAllStaleFollowed();
-		assertThat(this.provider.queries).containsExactly(category("entertainment").providerQuery());
+	void fullPassRefreshesEveryStaleCategoryFollowedOrNot() {
+		this.jdbc.sql("UPDATE categories SET last_fetched_at = now() WHERE slug = 'sports'").update();
+		this.ingestion.refreshAllStale();
+		List<String> expected = this.categories.findAll()
+			.stream()
+			.filter((c) -> !c.slug().equals("sports"))
+			.map(Category::providerQuery)
+			.toList();
+		assertThat(this.provider.queries).as("no one follows any category here").isEqualTo(expected);
 	}
 
 	@Test

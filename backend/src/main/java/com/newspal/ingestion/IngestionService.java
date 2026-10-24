@@ -80,12 +80,16 @@ public class IngestionService {
 		}
 	}
 
-	/** Refreshes every stale category that has at least one follower, one by one. */
-	public void refreshAllStaleFollowed() {
-		List<Category> stale = this.categories.findStaleFollowed(staleBefore());
-		for (Category category : stale) {
-			refreshIfStale(category);
+	/**
+	 * Refreshes every stale category, one by one (SPEC-v2 §5.1).
+	 * @return the number of new articles stored
+	 */
+	public int refreshAllStale() {
+		int inserted = 0;
+		for (Category category : this.categories.findStale(staleBefore())) {
+			inserted += refreshIfStale(category);
 		}
+		return inserted;
 	}
 
 	/**

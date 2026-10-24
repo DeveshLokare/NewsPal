@@ -37,6 +37,7 @@ The tests start a throwaway Postgres 16 in Docker (Testcontainers), so Docker mu
 | `SPRING_DATASOURCE_PASSWORD` | DB password | `newspal` |
 | `JWT_SECRET` | HS256 signing secret, at least 32 bytes | none, required |
 | `FREENEWS_API_KEY` | Free News API key. If empty, no news is fetched and no quota is used | empty |
+| `JOB_TOKEN` | Shared secret for `POST /api/internal/jobs/run`. If empty, that endpoint answers 404 | empty |
 
 Other news settings (`refresh-ttl`, `retention`, daily quotas, language/country) are under `newspal.news` and `newspal.freenews` in `application.yml`.
 
@@ -57,6 +58,7 @@ Other news settings (`refresh-ttl`, `retention`, daily quotas, language/country)
 
 ## Background jobs
 
-- On startup, then every hour: refresh stale categories that someone follows (each about every 2 h, `refresh-ttl`). A refresh lists up to 3 pages of new articles for the category's topic, then makes one `/details` call per article not stored yet.
-- Every hour at :15 (UTC): delete articles older than 7 days and keep at most 1000 per category.
+- A job pass runs the daily cleanup if it's due (at most once per 23 h, tracked in `job_runs`), then refreshes every stale category, followed or not (stale = not fetched for `refresh-ttl`, 1 h 50 m). A refresh lists up to 3 pages of new articles for the category's topic, then makes one `/details` call per article not stored yet. Only one pass runs at a time.
+- A pass runs on startup, every 2 hours at :05 UTC while the service is awake, and when `POST /api/internal/jobs/run` is called with the `X-Job-Token` header (`JOB_TOKEN`). A GitHub Actions workflow calls it every 2 hours, which also wakes the service on Render (DEPLOY.md §6). The endpoint returns `202 {"started": true}`, or `false` if a pass is already running, and `404` for a missing or wrong token.
+- Cleanup deletes articles older than 7 days and keeps at most 1000 per category. A 03:30 UTC timer also checks whether it's due.
 - Every provider call is counted per UTC day in the `api_usage` table (3,600 for refreshes, 1,000 for older news; the API allows 5,000/day). Fetching also pauses until the daily reset once Free News API reports fewer than 100 requests left, or says the quota is used up.

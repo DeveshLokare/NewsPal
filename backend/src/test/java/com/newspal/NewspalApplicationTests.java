@@ -25,9 +25,9 @@ class NewspalApplicationTests {
 		Integer tables = this.jdbc.queryForObject("""
 				SELECT count(*) FROM information_schema.tables
 				WHERE table_schema = 'public' AND table_name IN
-				('users','categories','user_categories','articles','archived_articles','api_usage')""",
+				('users','categories','user_categories','articles','archived_articles','api_usage','job_runs')""",
 				Integer.class);
-		assertThat(tables).isEqualTo(6);
+		assertThat(tables).isEqualTo(7);
 	}
 
 }

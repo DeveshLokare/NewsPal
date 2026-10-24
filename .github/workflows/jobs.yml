@@ -1,0 +1,42 @@
+# Wakes the NewsPal API every 2 hours and starts its background jobs: refresh every
+# news category, plus the daily cleanup (SPEC-v2 §5.2). Render's free plan sleeps
+# after 15 idle minutes, so the in-process timers can't do this alone.
+#
+# Setup (DEPLOY.md §6): repository variable API_BASE_URL (e.g.
+# https://newspal-api.onrender.com) and repository secret JOB_TOKEN, the same value
+# as JOB_TOKEN on Render.
+name: Background jobs
+
+on:
+  schedule:
+    # GitHub may start scheduled runs some minutes late; that's fine here.
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wake the API and start the jobs
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          JOB_TOKEN: ${{ secrets.JOB_TOKEN }}
+        run: |
+          if [ -z "$API_BASE_URL" ] || [ -z "$JOB_TOKEN" ]; then
+            echo "::error::Set the API_BASE_URL variable and the JOB_TOKEN secret (see DEPLOY.md)"
+            exit 1
+          fi
+          # A cold start takes about a minute; the service also runs a pass on startup,
+          # so the jobs still happen if this request gives up.
+          status=$(curl --silent --show-error --output response.json --write-out '%{http_code}' \
+            --retry 3 --retry-delay 20 --retry-connrefused --max-time 120 \
+            --request POST --header "X-Job-Token: $JOB_TOKEN" \
+            "${API_BASE_URL%/}/api/internal/jobs/run") || status="000"
+          echo "HTTP $status: $(cat response.json 2>/dev/null)"
+          if [ "$status" = "404" ]; then
+            echo "::error::404: JOB_TOKEN doesn't match the one on Render, or it isn't set there"
+          fi
+          [ "$status" = "202" ]

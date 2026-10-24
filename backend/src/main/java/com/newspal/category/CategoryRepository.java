@@ -46,14 +46,15 @@ public class CategoryRepository {
 				ORDER BY c.sort_order, c.id""").param(userId).query(CategoryRepository::map).list();
 	}
 
-	/** Categories with at least one follower whose last fetch is older than {@code staleBefore}. */
-	public List<Category> findStaleFollowed(Instant staleBefore) {
-		return this.jdbc.sql("""
-				SELECT c.id, c.slug, c.name, c.provider_query, c.sort_order, c.last_fetched_at
-				FROM categories c
-				WHERE EXISTS (SELECT 1 FROM user_categories uc WHERE uc.category_id = c.id)
-				  AND (c.last_fetched_at IS NULL OR c.last_fetched_at < ?)
-				ORDER BY c.sort_order, c.id""")
+	/**
+	 * Categories whose last fetch is older than {@code staleBefore}, followed or not:
+	 * search covers every category (SPEC-v2 §5.1).
+	 */
+	public List<Category> findStale(Instant staleBefore) {
+		return this.jdbc.sql("SELECT " + COLUMNS + """
+				 FROM categories
+				WHERE last_fetched_at IS NULL OR last_fetched_at < ?
+				ORDER BY sort_order, id""")
 			.param(Timestamp.from(staleBefore))
 			.query(CategoryRepository::map)
 			.list();

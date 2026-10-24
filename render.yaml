@@ -26,6 +26,9 @@ services:
         sync: false
       - key: FREENEWS_API_KEY
         sync: false
+      # Shared with the GitHub Actions workflow that wakes the service (DEPLOY.md §6).
+      - key: JOB_TOKEN
+        sync: false
       # Render generates a random secret once; it never appears in git.
       - key: JWT_SECRET
         generateValue: true
