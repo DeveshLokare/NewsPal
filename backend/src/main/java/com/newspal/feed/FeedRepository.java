@@ -64,7 +64,11 @@ public class FeedRepository {
 			.list());
 	}
 
-	private static ArticleDto map(ResultSet rs, int rowNum) throws SQLException {
+	/**
+	 * Maps a row with {@code a.*} article columns, {@code c.slug} and an
+	 * {@code archived} flag; also used by search.
+	 */
+	public static ArticleDto map(ResultSet rs, int rowNum) throws SQLException {
 		return new ArticleDto(rs.getLong("id"), rs.getString("url"), rs.getString("title"), rs.getString("summary"),
 				rs.getString("image_url"), rs.getString("source"), rs.getTimestamp("published_at").toInstant(),
 				rs.getString("slug"), rs.getBoolean("archived"));

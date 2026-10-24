@@ -29,6 +29,9 @@ public final class ErrorCodes {
 	/** Too many reset requests from one IP. */
 	public static final String RESET_RATE_LIMITED = "RESET_RATE_LIMITED";
 
+	/** Too many searches in a minute (SPEC-v2 §8.1). */
+	public static final String SEARCH_RATE_LIMITED = "SEARCH_RATE_LIMITED";
+
 	public static final String OLDER_RATE_LIMITED = "OLDER_RATE_LIMITED";
 
 	public static final String QUOTA_EXHAUSTED = "QUOTA_EXHAUSTED";
