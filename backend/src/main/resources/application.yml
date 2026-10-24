@@ -46,29 +46,34 @@ newspal:
     secret: ${JWT_SECRET}
     ttl: P7D
   news:
-    # webz.io /api/news bills ~0.06 credit per 10-post call; ~5.00 credit/month = ~83 calls (SPEC §4.2).
-    # 8 categories refreshed every 3.5 days = ~69 calls/month.
-    refresh-ttl: PT84H
+    # Free News API allows 5,000 requests/day; each new article costs a list share plus
+    # one /details call (SPEC-v2 §4.5). Refresh every category about every 2 hours.
+    refresh-ttl: PT1H50M
     # Must exceed refresh-ttl or feeds empty out between refreshes.
     retention: P7D
-    max-per-category: 200
+    max-per-category: 1000
     summary-max-chars: 500
+    # List pages (10 articles each) fetched per category per refresh.
+    max-list-pages: 3
     quota:
-      ingestion-monthly: 68
-      older-monthly: 8
+      # Provider calls per UTC day; 400 of the 5,000 are left as margin.
+      ingestion-daily: 3600
+      older-daily: 1000
     older:
       cache-ttl: PT1H
       per-user-daily: 10
       max-age: P30D
-  webz:
-    base-url: https://api.webz.io
-    endpoint: /api/news
+  freenews:
+    base-url: https://api.freenewsapi.io/v1
     # Leave empty to run without fetching news (no quota is used).
-    token: ${WEBZ_TOKEN:}
+    api-key: ${FREENEWS_API_KEY:}
+    language: en
+    # Empty: English news from all countries.
+    country:
     timeout: PT10S
-    # webz.io returns HTTP 429 for back-to-back calls.
-    min-interval: PT2S
-    # Stop calling for the rest of the month once webz.io reports a balance below this.
-    min-balance: 0.30
+    # The API allows 2 requests per second.
+    min-interval: PT0.55S
+    # Pause until the daily reset when the API reports fewer requests left than this.
+    min-remaining: 100
   scheduling:
     enabled: true

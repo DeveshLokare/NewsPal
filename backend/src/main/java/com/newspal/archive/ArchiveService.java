@@ -51,7 +51,7 @@ public class ArchiveService {
 		String hash = UrlUtils.hash(request.url());
 		String image = (request.imageUrl() != null && UrlUtils.isHttpUrl(request.imageUrl())) ? request.imageUrl()
 				: null;
-		ProviderArticle article = new ProviderArticle(request.url().trim(),
+		ProviderArticle article = new ProviderArticle(null, request.url().trim(),
 				ArticleCleaner.truncate(request.title().strip(), ArticleCleaner.TITLE_MAX),
 				ArticleCleaner.truncate(ArticleCleaner.collapseWhitespace(request.summary()),
 						this.properties.summaryMaxChars()),

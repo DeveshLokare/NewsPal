@@ -6,10 +6,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -30,7 +31,8 @@ import com.newspal.ingestion.QuotaService.Bucket;
 import com.newspal.provider.NewsProvider;
 import com.newspal.provider.ProviderArticle;
 import com.newspal.provider.ProviderException;
-import com.newspal.provider.ProviderPage;
+import com.newspal.provider.ProviderRef;
+import com.newspal.provider.ProviderRefPage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,9 +40,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 /**
- * Live "older news" beyond the stored window (SPEC §5). Results are cached, never
- * stored. Cursors handed to the app are random ids; the provider's own paging
- * cursor (which contains the API token) stays on the server.
+ * Live "older news" beyond the stored window (SPEC §5, SPEC-v2 §4.6). Results are
+ * cached, never stored. Cursors handed to the app are random ids; the provider's own
+ * paging cursor stays on the server. A page costs one list call plus one details call
+ * per article, all from the daily {@code older} quota.
  */
 @Service
 public class OlderNewsService {
@@ -125,9 +128,9 @@ public class OlderNewsService {
 			used.decrementAndGet();
 			throw unavailable();
 		}
-		ProviderPage result;
+		ProviderRefPage result;
 		try {
-			result = this.provider.fetchOlder(state.query(), state.before(), state.notBefore(),
+			result = this.provider.listOlder(state.query(), state.before(), state.notBefore(),
 					state.providerCursor());
 		}
 		catch (ProviderException ex) {
@@ -135,12 +138,11 @@ public class OlderNewsService {
 			throw new ApiException(HttpStatus.BAD_GATEWAY, ErrorCodes.PROVIDER_ERROR,
 					"Couldn't load older news right now");
 		}
-		int maxChars = this.properties.summaryMaxChars();
-		List<ProviderArticle> items = result.items()
-			.stream()
-			.map((article) -> ArticleCleaner.clean(article, maxChars))
-			.filter(Objects::nonNull)
-			.toList();
+		// Reserve the whole page's details up front so we never serve half a page.
+		if (!this.quota.tryAcquire(Bucket.OLDER, result.items().size())) {
+			throw unavailable();
+		}
+		List<ProviderArticle> items = fetchDetails(result.items());
 		String nextId = null;
 		if (result.nextCursor() != null) {
 			nextId = UUID.randomUUID().toString();
@@ -148,6 +150,24 @@ public class OlderNewsService {
 					result.nextCursor()));
 		}
 		return new CachedPage(items, nextId);
+	}
+
+	/** Details for each ref, newest first; refs whose details fail or can't be shown are skipped. */
+	private List<ProviderArticle> fetchDetails(List<ProviderRef> refs) {
+		int maxChars = this.properties.summaryMaxChars();
+		List<ProviderArticle> items = new ArrayList<>();
+		for (ProviderRef ref : refs) {
+			Optional<ProviderArticle> article;
+			try {
+				article = this.provider.details(ref.providerId());
+			}
+			catch (ProviderException ex) {
+				logger.debug("Details for {} failed: {}", ref.providerId(), ex.getMessage());
+				continue;
+			}
+			article.map((a) -> ArticleCleaner.clean(a, maxChars)).ifPresent(items::add);
+		}
+		return items;
 	}
 
 	private FeedPage toFeedPage(long userId, String slug, CachedPage page) {

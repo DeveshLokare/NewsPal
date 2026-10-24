@@ -10,8 +10,8 @@ import com.newspal.TestcontainersConfiguration;
 import com.newspal.ingestion.QuotaService;
 import com.newspal.ingestion.QuotaService.Bucket;
 import com.newspal.provider.ProviderArticle;
-import com.newspal.provider.ProviderPage;
 import com.newspal.support.FakeNewsProvider;
+import com.newspal.support.FakeNewsProvider.Page;
 import com.newspal.support.FakeProviderConfig;
 import com.newspal.support.TestUsers;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,10 +70,10 @@ class OlderNewsTests {
 		this.bearer = TestUsers.register(this.mvc, "older@example.com");
 		TestUsers.follow(this.mvc, this.bearer, "technology", "sports");
 		this.provider.olderPages = List.of(
-				new ProviderPage(List.of(article("https://example.com/old1"),
-						new ProviderArticle("https://dailymotion.com/v", "Video", null, null, "dm", daysAgo(9))),
+				new Page(List.of(article("https://example.com/old1"),
+						new ProviderArticle(null, "https://dailymotion.com/v", "Video", null, null, "dm", daysAgo(9))),
 						"/api/news?token=secret&from=10"),
-				new ProviderPage(List.of(article("https://example.com/old2")), null));
+				new Page(List.of(article("https://example.com/old2")), null));
 	}
 
 	@Test
@@ -95,7 +95,7 @@ class OlderNewsTests {
 			.andExpect(jsonPath("$.items[0].url").value("https://example.com/old2"))
 			.andExpect(jsonPath("$.nextCursor").value(nullValue()));
 		assertThat(this.provider.olderCursors).isEqualTo(Arrays.asList(null, "/api/news?token=secret&from=10"));
-		assertThat(this.quota.used(Bucket.OLDER)).isEqualTo(2);
+		assertThat(this.quota.used(Bucket.OLDER)).as("2 lists + 3 details").isEqualTo(5);
 	}
 
 	@Test
@@ -106,7 +106,7 @@ class OlderNewsTests {
 		older(other, "technology", null).andExpect(status().isOk())
 			.andExpect(jsonPath("$.items[0].url").value("https://example.com/old1"));
 		assertThat(this.provider.olderCalls).hasValue(1);
-		assertThat(this.quota.used(Bucket.OLDER)).isEqualTo(1);
+		assertThat(this.quota.used(Bucket.OLDER)).as("1 list + 2 details").isEqualTo(3);
 	}
 
 	@Test
@@ -138,8 +138,7 @@ class OlderNewsTests {
 
 	@Test
 	void exhaustedQuotaOrDisabledProviderIsUnavailable() throws Exception {
-		this.jdbc.sql("INSERT INTO api_usage (month, bucket, calls) VALUES (to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM'), 'older', 8)")
-			.update();
+		setOlderUsed(1000);
 		older(this.bearer, "technology", null).andExpect(status().isTooManyRequests())
 			.andExpect(jsonPath("$.code").value("QUOTA_EXHAUSTED"));
 		this.provider.enabled = false;
@@ -158,6 +157,22 @@ class OlderNewsTests {
 			.andExpect(jsonPath("$.items", not(hasSize(0))));
 	}
 
+	@Test
+	void quotaThatCantCoverThePageDetailsIsUnavailable() throws Exception {
+		// The list call fits, but the page's two details calls don't.
+		setOlderUsed(1000 - 2);
+		older(this.bearer, "technology", null).andExpect(status().isTooManyRequests())
+			.andExpect(jsonPath("$.code").value("QUOTA_EXHAUSTED"));
+		assertThat(this.provider.detailCalls).hasValue(0);
+		assertThat(this.quota.used(Bucket.OLDER)).isEqualTo(1000 - 1);
+	}
+
+	private void setOlderUsed(int calls) {
+		this.jdbc.sql("""
+				INSERT INTO api_usage (period, bucket, calls)
+				VALUES (to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD'), 'older', ?)""").param(calls).update();
+	}
+
 	private ResultActions older(String bearer, String category, String cursor) throws Exception {
 		var request = get("/api/feed/older").header("Authorization", bearer);
 		if (category != null) {
@@ -170,7 +185,7 @@ class OlderNewsTests {
 	}
 
 	static ProviderArticle article(String url) {
-		return new ProviderArticle(url, "Older story", "An older summary", "https://example.com/img.jpg",
+		return new ProviderArticle(null, url, "Older story", "An older summary", "https://example.com/img.jpg",
 				"example.com", daysAgo(10));
 	}
 

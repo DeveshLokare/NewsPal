@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
 /**
- * Replaces the webz.io provider with a {@link FakeNewsProvider}.
+ * Replaces the Free News API provider with a {@link FakeNewsProvider}.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class FakeProviderConfig {

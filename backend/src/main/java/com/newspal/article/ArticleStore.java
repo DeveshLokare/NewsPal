@@ -2,7 +2,10 @@ package com.newspal.article;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.newspal.common.UrlUtils;
 import com.newspal.provider.ProviderArticle;
@@ -31,8 +34,20 @@ public class ArticleStore {
 		return (newest.isEmpty() || newest.get(0) == null) ? null : newest.get(0).toInstant();
 	}
 
+	/** Which of {@code providerIds} are already stored, so their details needn't be fetched. */
+	public Set<String> existingProviderIds(Collection<String> providerIds) {
+		if (providerIds.isEmpty()) {
+			return Set.of();
+		}
+		return new HashSet<>(this.jdbc.sql("SELECT provider_id FROM articles WHERE provider_id IN (:ids)")
+			.param("ids", providerIds)
+			.query(String.class)
+			.list());
+	}
+
 	/**
-	 * Inserts articles, ignoring any whose normalized URL is already stored.
+	 * Inserts articles, ignoring any whose normalized URL or provider id is already
+	 * stored.
 	 * @return the number of new rows
 	 */
 	public int insertNew(short categoryId, List<ProviderArticle> articles, int summaryMaxChars) {
@@ -43,10 +58,12 @@ public class ArticleStore {
 				continue;
 			}
 			inserted += this.jdbc.sql("""
-					INSERT INTO articles (url_hash, url, title, summary, image_url, source, published_at, category_id)
-					VALUES (:hash, :url, :title, :summary, :image, :source, :published, :category)
-					ON CONFLICT (url_hash) DO NOTHING""")
+					INSERT INTO articles (url_hash, url, title, summary, image_url, source, published_at, category_id,
+					                      provider_id)
+					VALUES (:hash, :url, :title, :summary, :image, :source, :published, :category, :providerId)
+					ON CONFLICT DO NOTHING""")
 				.param("hash", UrlUtils.hash(article.url()))
+				.param("providerId", article.providerId())
 				.param("url", article.url())
 				.param("title", article.title())
 				.param("summary", article.summary())
