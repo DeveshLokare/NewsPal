@@ -329,7 +329,7 @@ CREATE INDEX idx_articles_search ON articles USING GIN (search_vector);
 (`Article` keeps it unmapped, or `insertable=false, updatable=false`, so `ddl-auto: validate` still passes.)
 
 **Endpoint:** `GET /api/search?q={text}&category={slug?}&cursor={opaque?}&size={1..50, default 20}` (JWT required)
-- `q`: trimmed, 2–100 chars, else `400 VALIDATION_FAILED`. Parsed with `websearch_to_tsquery('english', :q)`, so users can type `"exact phrase"`, `-word` and `or`. A query that reduces to nothing (only stop-words, e.g. "the") returns an empty page, not an error.
+- `q`: trimmed, 2–100 chars, else `400 VALIDATION_FAILED`. Parsed with `websearch_to_tsquery('english', :q)`, so users can type `"exact phrase"`, `-word` and `or`. A query that reduces to nothing (only stop-words, e.g. "the") returns an empty page, not an error. **Prefix on the last word (added in M11):** because the app searches as the user types, a plain last word (not quoted, negated or after "or") is matched as a prefix, `to_tsquery('english', 'word:*')`, so "tesl" already finds Tesla.
 - **Scope (decided 2026-10-24):** all stored articles (all 8 categories, last 7 days), not just followed categories. `category`, if given, must be a known slug (`400` otherwise). It doesn't need to be followed.
 - **Order:** newest first, `(published_at, id) DESC`, using the existing `CursorCodec` keyset cursor. Relevance only filters, it doesn't sort: news readers expect recency, and keyset paging stays simple.
 - **Response:** the `FeedPage` shape (`items` with the `archived` flag, `nextCursor`; `lastRefreshedAt` omitted). Items render with the existing `ArticleCard`.

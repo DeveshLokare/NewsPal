@@ -55,6 +55,7 @@ Other news settings (`refresh-ttl`, `retention`, daily quotas, language/country)
 - `PUT /api/me/categories` `["technology","sports"]` → `204`
 - `GET /api/feed?category=&cursor=&size=` → `200 {items, nextCursor, lastRefreshedAt}` (stored articles, newest first)
 - `GET /api/feed/older?category=&cursor=` → `200 {items, nextCursor}` (live from Free News API, cached 1 h, not stored)
+- `GET /api/search?q=&category=&cursor=&size=` → `200 {items, nextCursor}`: full-text search over stored articles of every category (last 7 days), newest first. `q` is 2–100 chars and supports `"phrase"`, `-word` and `or`; the last word also matches as a prefix. 60 searches per user per minute (`429 SEARCH_RATE_LIMITED`)
 - `GET /api/archive?cursor=&size=` → `200 {items, nextCursor}`
 - `POST /api/archive` `{url, title, summary?, imageUrl?, source?, publishedAt?, category?}` → `201` new / `200` existing
 - `DELETE /api/archive/{id}` → `204`
