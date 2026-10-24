@@ -19,6 +19,14 @@ void main() {
 
   setUp(() => fakes = Fakes());
 
+  Future<void> pickQuestion(WidgetTester tester, String question) async {
+    await tester.ensureVisible(find.byKey(const ValueKey('security-question')));
+    await tester.tap(find.byKey(const ValueKey('security-question')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(question).last);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('signed-out user lands on login', (tester) async {
     await pumpApp(tester);
     expect(find.text('Welcome back'), findsOneWidget);
@@ -52,7 +60,15 @@ void main() {
     await tester.enterText(find.widgetWithText(TextFormField, 'Confirm password'), 'password123');
     await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
     await tester.pumpAndSettle();
+    expect(find.text('Pick a question'), findsOneWidget, reason: 'the security question is required');
+    expect(fakes.auth.calls, isEmpty);
 
+    await pickQuestion(tester, 'What was the name of your first pet?');
+    await tester.enterText(find.byKey(const ValueKey('security-answer')), 'Mr. Whiskers');
+    await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
+    await tester.pumpAndSettle();
+
+    expect(fakes.auth.questions['new@example.com'], (1, 'Mr. Whiskers'));
     expect(find.text('What do you want to read?'), findsOneWidget);
     final continueButton = find.widgetWithText(FilledButton, 'Pick at least one');
     expect(tester.widget<FilledButton>(continueButton).onPressed, isNull);
@@ -75,6 +91,8 @@ void main() {
     await tester.enterText(find.widgetWithText(TextFormField, 'Email'), 'taken@example.com');
     await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'password123');
     await tester.enterText(find.widgetWithText(TextFormField, 'Confirm password'), 'password123');
+    await pickQuestion(tester, 'What was the name of your first pet?');
+    await tester.enterText(find.byKey(const ValueKey('security-answer')), 'Rex');
     await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
     await tester.pumpAndSettle();
     expect(find.text('This email is already registered. Log in instead?'), findsOneWidget);
@@ -90,6 +108,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('me@example.com'), findsOneWidget);
     await tester.tap(find.text('Log out'));
+    await tester.pumpAndSettle();
+    expect(find.text('Log out?'), findsOneWidget, reason: 'asks first');
+    await tester.tap(find.widgetWithText(FilledButton, 'Log out'));
     await tester.pumpAndSettle();
     expect(find.text('Welcome back'), findsOneWidget);
     expect(fakes.store.session, isNull);

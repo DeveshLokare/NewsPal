@@ -6,6 +6,7 @@ import '../../app/router.dart';
 import '../../core/api_error.dart';
 import 'auth_controller.dart';
 import 'auth_form.dart';
+import 'security_question_fields.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
@@ -19,28 +20,37 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
+  final _answer = TextEditingController();
+  int? _questionId;
   bool _busy = false;
   bool _obscure = true;
   String? _error;
   String? _emailError;
+  String? _answerError;
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
     _confirm.dispose();
+    _answer.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    setState(() => _emailError = null);
+    setState(() {
+      _emailError = null;
+      _answerError = null;
+    });
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await ref.read(authControllerProvider.notifier).register(_email.text.trim(), _password.text);
+      await ref
+          .read(authControllerProvider.notifier)
+          .register(_email.text.trim(), _password.text, questionId: _questionId, answer: _answer.text);
     } on ApiError catch (e) {
       if (!mounted) return;
       setState(() {
@@ -48,6 +58,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           _emailError = 'This email is already registered. Log in instead?';
         } else if (e.fieldErrors.containsKey('email')) {
           _emailError = 'Enter a valid email';
+        } else if (e.fieldErrors.containsKey('answer')) {
+          _answerError = 'Use at least 3 letters or digits';
+        } else if (e.fieldErrors.containsKey('questionId')) {
+          _error = 'Pick one of the security questions';
         } else {
           _error = e.message;
         }
@@ -103,9 +117,17 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 controller: _confirm,
                 decoration: const InputDecoration(labelText: 'Confirm password', prefixIcon: Icon(Icons.lock_outline)),
                 obscureText: _obscure,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => _submit(),
+                textInputAction: TextInputAction.next,
                 validator: (v) => v != _password.text ? "Passwords don't match" : null,
+              ),
+              const SizedBox(height: 16),
+              SecurityQuestionFields(
+                questionId: _questionId,
+                onQuestionChanged: (id) => setState(() => _questionId = id),
+                answer: _answer,
+                answerError: _answerError,
+                textInputAction: TextInputAction.done,
+                onAnswerSubmitted: (_) => _submit(),
               ),
               const SizedBox(height: 12),
               FormErrorText(_error),

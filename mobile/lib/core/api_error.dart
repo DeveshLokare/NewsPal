@@ -2,7 +2,13 @@ import 'package:dio/dio.dart';
 
 /// The backend's error shape (SPEC §7.1), or a client-side network failure.
 class ApiError implements Exception {
-  ApiError({required this.code, required this.message, this.status, this.fieldErrors = const {}});
+  ApiError({
+    required this.code,
+    required this.message,
+    this.status,
+    this.fieldErrors = const {},
+    this.details = const {},
+  });
 
   /// Couldn't reach the server (offline, DNS, timeout).
   static const network = 'NETWORK';
@@ -13,6 +19,12 @@ class ApiError implements Exception {
 
   /// field name → message, from validation errors.
   final Map<String, String> fieldErrors;
+
+  /// Extra fields some errors carry, such as `attemptsLeft` (SPEC-v2 §7.4).
+  final Map<String, Object?> details;
+
+  /// Wrong security answers left before resets lock, for `WRONG_ANSWER`.
+  int? get attemptsLeft => (details['attemptsLeft'] as num?)?.toInt();
 
   factory ApiError.fromDio(DioException e) {
     final response = e.response;
@@ -33,11 +45,16 @@ class ApiError implements Exception {
           }
         }
       }
+      const known = {'code', 'message', 'fieldErrors'};
       return ApiError(
         code: data['code'] as String,
         message: (data['message'] as String?) ?? 'Something went wrong',
         status: response.statusCode,
         fieldErrors: fields,
+        details: {
+          for (final entry in data.entries)
+            if (entry.key is String && !known.contains(entry.key)) entry.key as String: entry.value,
+        },
       );
     }
     return ApiError(code: 'HTTP_${response.statusCode}', message: 'Something went wrong', status: response.statusCode);

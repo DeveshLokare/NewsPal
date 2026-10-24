@@ -6,6 +6,7 @@ import '../../app/router.dart';
 import '../../core/api_error.dart';
 import 'auth_controller.dart';
 import 'auth_form.dart';
+import 'password_reset_controller.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -84,7 +85,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 onFieldSubmitted: (_) => _submit(),
                 validator: (v) => AuthValidators.required(v, 'Enter your password'),
               ),
-              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _busy
+                      ? null
+                      : () {
+                          ref.read(passwordResetControllerProvider.notifier).start(_email.text);
+                          context.push(Routes.forgotPassword);
+                        },
+                  child: const Text('Forgot password?'),
+                ),
+              ),
               FormErrorText(_error),
               SubmitButton(label: 'Log in', busy: _busy, onPressed: _submit),
             ],
