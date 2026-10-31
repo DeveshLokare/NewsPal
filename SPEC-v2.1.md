@@ -1,7 +1,7 @@
 # NewsPal v0.2.1 — Bug Fix Specification
 
-> Status: **Draft** · 2026-11-01 · changes on top of v0.2.0.
-> [SPEC.md](SPEC.md) stays the full spec; §7 lists what to fold into it when this ships.
+> Status: **Historical** · the v0.2.1 plan (2026-11-01), written as changes on top of v0.2.0.
+> v0.2.1 shipped and **[SPEC.md](SPEC.md) is the full, current spec**; read that first. Code comments cite this file's sections. Where the two differ, SPEC.md describes what was built.
 
 ---
 
@@ -10,14 +10,14 @@
 | # | Bug | Cause | Fix | Area | Status | Section |
 |---|---|---|---|---|---|---|
 | B1 | Search shows no results for any keyword | Production backend was older than search (M11) | Deploy the current backend | Ops | **Fixed** 2026-11-01 | §3, §4 |
-| B2 | Category chips show on the Search screen | Built that way (US-17) | Remove the chips | Mobile | To do | §5 |
-| B3 | Latest news isn't shown when the app opens | The app doesn't re-read the database when reopened, or after a refresh finishes | Reload from the database automatically | Backend + Mobile | To do | §6 |
+| B2 | Category chips show on the Search screen | Built that way (US-17) | Remove the chips | Mobile | **Fixed** (PR #7) | §5 |
+| B3 | Latest news isn't shown when the app opens | The app doesn't re-read the database when reopened, or after a refresh finishes | Reload from the database automatically | Backend + Mobile | **Fixed** (PR #7) | §6 |
 | B4 | Settings shows no security question | Production backend was older than security questions (M10) | Deploy the current backend | Ops | **Fixed** 2026-11-01 | §3, §4 |
-| B5 | Long security questions are cropped | Dropdown text is cut to one line with an ellipsis | Wrap onto more lines | Mobile | To do | §5a |
+| B5 | Long security questions are cropped | Dropdown text is cut to one line with an ellipsis | Wrap onto more lines | Mobile | **Fixed** (PR #7) | §5a |
 
 App version: `0.2.0+2` → **`0.2.1+3`**.
 
-B1 and B4 needed a deploy, not new code. It went out on 2026-11-01 and fixed both. What remains is the app release (B2, B3, B5) and the check in §3.4. "Forgot password" shared the same cause and works too.
+B1 and B4 needed a deploy, not new code. It went out on 2026-11-01 and fixed both. "Forgot password" shared the same cause and works too.
 
 ---
 
