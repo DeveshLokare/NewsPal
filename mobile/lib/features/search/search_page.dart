@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/router.dart';
-import '../../app/theme.dart';
 import '../categories/category_repository.dart';
 import '../feed/article_card.dart';
 import 'search_controller.dart';
@@ -36,7 +35,6 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final controller = ref.read(searchControllerProvider.notifier);
     final categories = ref.watch(allCategoriesProvider).value ?? const <Category>[];
     final names = {for (final c in categories) c.slug: c.name};
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
@@ -69,30 +67,6 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       ),
       body: Column(
         children: [
-          SizedBox(
-            height: 52,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
-              children: [
-                for (final (slug, label) in [(null, 'All'), for (final c in categories) (c.slug, c.name)])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      key: ValueKey('search-chip-${slug ?? 'all'}'),
-                      label: Text(label),
-                      selected: state.category == slug,
-                      showCheckmark: false,
-                      labelStyle: TextStyle(
-                        color: state.category == slug ? Brand.charcoal : scheme.onSurface,
-                        fontWeight: state.category == slug ? FontWeight.w700 : FontWeight.w500,
-                      ),
-                      onSelected: (_) => controller.selectCategory(slug),
-                    ),
-                  ),
-              ],
-            ),
-          ),
           if (state.loading) const LinearProgressIndicator(minHeight: 2) else const SizedBox(height: 2),
           Expanded(child: _Results(state: state, names: names, onRecent: _useRecent)),
         ],
@@ -182,7 +156,7 @@ class _Results extends ConsumerWidget {
         return ArticleCard(
           key: ValueKey(article.url),
           article: article,
-          categoryName: state.category == null ? names[article.category] : null,
+          categoryName: names[article.category],
           onTap: () {
             controller.remember();
             context.push(Routes.article, extra: article);

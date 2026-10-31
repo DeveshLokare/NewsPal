@@ -34,15 +34,21 @@ class SecurityQuestionFields extends ConsumerWidget {
             key: const ValueKey('security-question'),
             initialValue: questionId,
             isExpanded: true,
+            // Long questions wrap: rows and the closed field grow with their text.
+            isDense: false,
+            itemHeight: null,
             decoration: const InputDecoration(
               labelText: 'Security question',
               prefixIcon: Icon(Icons.shield_outlined),
             ),
             items: [
               for (final q in list)
-                DropdownMenuItem(value: q.id, child: Text(q.text, overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(
+                  value: q.id,
+                  child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(q.text)),
+                ),
             ],
-            selectedItemBuilder: (_) => [for (final q in list) Text(q.text, overflow: TextOverflow.ellipsis)],
+            selectedItemBuilder: (_) => [for (final q in list) Text(q.text)],
             onChanged: onQuestionChanged,
             validator: (v) => v == null ? 'Pick a question' : null,
           ),
