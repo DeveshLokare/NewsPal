@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:newspal/app/app.dart';
+import 'package:newspal/features/auth/auth_repository.dart';
 
 import 'support/fakes.dart';
 
@@ -127,6 +129,29 @@ void main() {
       fakes.storeSession();
       fakes.categories.followed = ['business'];
       fakes.auth.users['me@example.com'] = 'password123';
+    });
+
+    testWidgets('long questions wrap instead of being cropped', (tester) async {
+      const long = 'What is the name of the street you lived on as a child, and in which town was it?';
+      fakes.auth.offered = const [SecurityQuestion(id: 1, text: long)];
+      fakes.auth.meHasQuestion = false;
+      await pumpApp(tester);
+      tester.view.physicalSize = const Size(960, 2400);
+      await tester.tap(find.text('Set it'));
+      await tester.pumpAndSettle();
+
+      void expectWholeAndWrapped(Finder text) {
+        expect(tester.renderObject<RenderParagraph>(text).didExceedMaxLines, isFalse);
+        expect(tester.getSize(text).height, greaterThan(30), reason: 'should take more than one line');
+      }
+
+      await tester.tap(find.byKey(const ValueKey('security-question')));
+      await tester.pumpAndSettle();
+      expectWholeAndWrapped(find.text(long).last);
+
+      await tester.tap(find.text(long).last);
+      await tester.pumpAndSettle();
+      expectWholeAndWrapped(find.text(long).first);
     });
 
     testWidgets('accounts without one see a banner that leads to Settings', (tester) async {

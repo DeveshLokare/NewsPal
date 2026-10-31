@@ -17,7 +17,7 @@ class _SlowSearch implements SearchRepository {
   final List<(String, Completer<FeedPageData>)> pending = [];
 
   @override
-  Future<FeedPageData> search({required String query, String? category, String? cursor, int size = 20}) {
+  Future<FeedPageData> search({required String query, String? cursor, int size = 20}) {
     final completer = Completer<FeedPageData>();
     pending.add((query, completer));
     return completer.future;
@@ -49,14 +49,14 @@ void main() {
         expect(fakes.search.calls, isEmpty);
         async.elapse(const Duration(milliseconds: 1));
         async.flushMicrotasks();
-        expect(fakes.search.calls, ['tesla||']);
+        expect(fakes.search.calls, ['tesla|']);
         expect(state().searched, isTrue);
       });
     });
 
     test('too-short text clears results without searching', () {
       fakeAsync((async) {
-        fakes.search.pages['tesla||'] = FeedPageData(items: [article('1')], nextCursor: null);
+        fakes.search.pages['tesla|'] = FeedPageData(items: [article('1')], nextCursor: null);
         controller().queryChanged('tesla');
         async.elapse(NewsSearchController.debounce);
         async.flushMicrotasks();
@@ -65,7 +65,7 @@ void main() {
         async.elapse(NewsSearchController.debounce);
         expect(state().items, isEmpty);
         expect(state().searched, isFalse);
-        expect(fakes.search.calls, ['tesla||']);
+        expect(fakes.search.calls, ['tesla|']);
       });
     });
 
@@ -92,7 +92,7 @@ void main() {
     });
 
     test('searching too fast is a calm notice that keeps results', () async {
-      fakes.search.pages['tesla||'] = FeedPageData(items: [article('1')], nextCursor: null);
+      fakes.search.pages['tesla|'] = FeedPageData(items: [article('1')], nextCursor: null);
       controller().submit('tesla');
       await Future<void>.delayed(Duration.zero);
       fakes.search.error = ApiError(code: 'SEARCH_RATE_LIMITED', message: 'slow down', status: 429);
@@ -127,13 +127,12 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('finds stories in any category and filters by chip', (tester) async {
-      fakes.search.pages['launch||'] = FeedPageData(
+    testWidgets('finds stories in any category, with no category filter', (tester) async {
+      // Business isn't followed (only technology is), but search covers it.
+      fakes.search.pages['launch|'] = FeedPageData(
         items: [article('1', category: 'technology'), article('2', category: 'business')],
         nextCursor: null,
       );
-      fakes.search.pages['launch|business|'] =
-          FeedPageData(items: [article('2', category: 'business')], nextCursor: null);
       await pumpApp(tester);
       await tester.tap(find.byKey(const ValueKey('open-search')));
       await tester.pumpAndSettle();
@@ -142,13 +141,7 @@ void main() {
       await type(tester, 'launch');
       expect(find.text('Story 1'), findsOneWidget);
       expect(find.text('Story 2'), findsOneWidget);
-
-      // Business isn't followed (only technology is), but search covers it.
-      await tester.tap(find.byKey(const ValueKey('search-chip-business')));
-      await tester.pumpAndSettle();
-      expect(find.text('Story 1'), findsNothing);
-      expect(find.text('Story 2'), findsOneWidget);
-      expect(fakes.search.calls.last, 'launch|business|');
+      expect(find.byType(ChoiceChip), findsNothing);
     });
 
     testWidgets('says when nothing matches', (tester) async {
@@ -167,7 +160,7 @@ void main() {
       await type(tester, 'tesla');
       expect(find.text('offline'), findsOneWidget);
       fakes.search.error = null;
-      fakes.search.pages['tesla||'] = FeedPageData(items: [article('1')], nextCursor: null);
+      fakes.search.pages['tesla|'] = FeedPageData(items: [article('1')], nextCursor: null);
       await tester.tap(find.text('Try again'));
       await tester.pumpAndSettle();
       expect(find.text('Story 1'), findsOneWidget);

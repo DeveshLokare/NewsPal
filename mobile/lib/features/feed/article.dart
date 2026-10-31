@@ -37,16 +37,21 @@ class Article {
 }
 
 class FeedPageData {
-  const FeedPageData({required this.items, required this.nextCursor, this.lastRefreshedAt});
+  const FeedPageData({required this.items, required this.nextCursor, this.lastRefreshedAt, this.refreshing = false});
 
   final List<Article> items;
   final String? nextCursor;
   final DateTime? lastRefreshedAt;
+
+  /// New articles may still arrive: the backend is refreshing these categories.
+  final bool refreshing;
 
   factory FeedPageData.fromJson(Map<String, dynamic> json) => FeedPageData(
         items: (json['items'] as List<dynamic>).map((e) => Article.fromJson(e as Map<String, dynamic>)).toList(),
         nextCursor: json['nextCursor'] as String?,
         lastRefreshedAt:
             json['lastRefreshedAt'] == null ? null : DateTime.parse(json['lastRefreshedAt'] as String).toUtc(),
+        // Older backends don't send it.
+        refreshing: json['refreshing'] as bool? ?? false,
       );
 }

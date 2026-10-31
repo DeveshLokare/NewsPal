@@ -101,19 +101,58 @@ class _CategoryChips extends ConsumerWidget {
 }
 
 /// The paged list for one chip.
-class FeedList extends ConsumerWidget {
+class FeedList extends ConsumerStatefulWidget {
   const FeedList({super.key, required this.category, required this.categoryNames});
 
   final String? category;
   final Map<String, String> categoryNames;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FeedList> createState() => _FeedListState();
+}
+
+class _FeedListState extends ConsumerState<FeedList> {
+  /// How far down the list still counts as the top.
+  static const _topSlack = 100.0;
+
+  final _scroll = ScrollController();
+  late final FeedController _controller = ref.read(feedControllerProvider(widget.category).notifier);
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.atTop = true;
+    _scroll.addListener(() => _controller.atTop = _scroll.offset < _topSlack);
+    _lifecycle = AppLifecycleListener(onHide: _controller.pausePolling, onResume: _controller.reloadIfDue);
+    // Coming back to a chip that already has a list.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _controller.reloadIfDue();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.pausePolling();
+    _lifecycle.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _showNewStories() {
+    _controller.showPending();
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final category = widget.category;
+    final categoryNames = widget.categoryNames;
     final provider = feedControllerProvider(category);
     final feed = ref.watch(provider);
-    final controller = ref.read(provider.notifier);
+    final controller = _controller;
 
-    return RefreshIndicator(
+    final list = RefreshIndicator(
       color: Brand.charcoal,
       backgroundColor: Brand.lime,
       onRefresh: controller.refresh,
@@ -131,6 +170,7 @@ class FeedList extends ConsumerWidget {
             return _EmptyFeed(state: state, controller: controller);
           }
           return ListView.builder(
+            controller: _scroll,
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.only(bottom: 24),
             itemCount: state.items.length + 2,
@@ -148,6 +188,26 @@ class FeedList extends ConsumerWidget {
           );
         },
       ),
+    );
+    if (feed.value?.pending == null) return list;
+    return Stack(
+      children: [
+        list,
+        Positioned(
+          top: 8,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: FilledButton.icon(
+              key: const ValueKey('new-stories'),
+              onPressed: _showNewStories,
+              icon: const Icon(Icons.arrow_upward, size: 18),
+              label: const Text('New stories'),
+              style: FilledButton.styleFrom(backgroundColor: Brand.lime, foregroundColor: Brand.charcoal),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

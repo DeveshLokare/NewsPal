@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:newspal/app/app.dart';
 import 'package:newspal/core/api_error.dart';
 import 'package:newspal/features/feed/article.dart';
+import 'package:newspal/features/feed/feed_controller.dart';
+import 'package:newspal/features/feed/feed_page.dart';
 
 import 'support/fakes.dart';
 
@@ -41,6 +43,64 @@ void main() {
     expect(find.text('Sports'), findsNWidgets(2), reason: 'chip + card label');
     expect(find.text('Updated 2h ago'), findsOneWidget);
     expect(find.text('Pick a category above to load older news.'), findsOneWidget);
+  });
+
+  group('fresh news without a pull', () {
+    int reads() => fakes.feed.calls.where((c) => c == 'feed |').length;
+
+    void reopen(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    testWidgets('new stories appear when the app is reopened', (tester) async {
+      fakes.feed.pages['|'] = FeedPageData(items: [article('1')], nextCursor: null);
+      await pumpApp(tester);
+      final container = ProviderScope.containerOf(tester.element(find.byType(FeedList)));
+      final later = DateTime.now().add(FeedController.reloadGap);
+      container.read(feedControllerProvider(null).notifier).now = () => later;
+      fakes.feed.pages['|'] = FeedPageData(items: [article('2'), article('1')], nextCursor: null);
+
+      reopen(tester);
+      await tester.pumpAndSettle();
+      expect(find.text('Story 2'), findsOneWidget);
+    });
+
+    testWidgets('scrolled down, a button brings them in', (tester) async {
+      fakes.feed.pages['|'] = FeedPageData(items: [for (var i = 0; i < 12; i++) article('$i')], nextCursor: null);
+      await pumpApp(tester);
+      await tester.drag(find.byType(ListView).last, const Offset(0, -600));
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(tester.element(find.byType(FeedList)));
+      fakes.feed.pages['|'] =
+          FeedPageData(items: [article('new'), for (var i = 0; i < 12; i++) article('$i')], nextCursor: null);
+
+      await container.read(feedControllerProvider(null).notifier).silentRefresh();
+      await tester.pumpAndSettle();
+      expect(find.text('Story new'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('new-stories')));
+      await tester.pumpAndSettle();
+      expect(find.text('Story new'), findsOneWidget);
+      expect(find.byKey(const ValueKey('new-stories')), findsNothing);
+    });
+
+    testWidgets('a quick app switch sends no request', (tester) async {
+      fakes.feed.pages['|'] = FeedPageData(items: [article('1')], nextCursor: null);
+      await pumpApp(tester);
+      final before = reads();
+      reopen(tester);
+      await tester.pumpAndSettle();
+      expect(reads(), before);
+    });
   });
 
   testWidgets('a chip filters the feed', (tester) async {

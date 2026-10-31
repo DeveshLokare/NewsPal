@@ -21,8 +21,13 @@ public final class FeedDtos {
 			Instant publishedAt, String category, boolean archived) {
 	}
 
+	/**
+	 * @param refreshing on the feed's first page, whether new articles may still arrive
+	 * (SPEC-v2.1 §6.3); {@code null} and left out elsewhere
+	 */
 	public record FeedPage(List<ArticleDto> items, String nextCursor,
-			@JsonInclude(JsonInclude.Include.NON_NULL) Instant lastRefreshedAt) {
+			@JsonInclude(JsonInclude.Include.NON_NULL) Instant lastRefreshedAt,
+			@JsonInclude(JsonInclude.Include.NON_NULL) Boolean refreshing) {
 	}
 
 }

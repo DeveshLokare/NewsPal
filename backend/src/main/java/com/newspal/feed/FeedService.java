@@ -41,7 +41,7 @@ public class FeedService {
 		CursorCodec.Position after = CursorCodec.decode(cursor);
 		List<Category> selected = followedCategories(userId, categorySlug);
 		if (selected.isEmpty()) {
-			return new FeedPage(List.of(), null, null);
+			return new FeedPage(List.of(), null, null, (after == null) ? false : null);
 		}
 		if (after == null) {
 			// First page: refresh stale categories in the background; never wait for the provider.
@@ -60,7 +60,8 @@ public class FeedService {
 			.filter(Objects::nonNull)
 			.max(Instant::compareTo)
 			.orElse(null);
-		return new FeedPage(List.copyOf(items), next, lastRefreshedAt);
+		Boolean refreshing = (after == null) ? this.ingestion.isRefreshing(selected) : null;
+		return new FeedPage(List.copyOf(items), next, lastRefreshedAt, refreshing);
 	}
 
 	/**

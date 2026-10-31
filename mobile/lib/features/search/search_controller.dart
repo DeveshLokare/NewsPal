@@ -11,7 +11,6 @@ import 'search_repository.dart';
 class SearchState {
   const SearchState({
     this.query = '',
-    this.category,
     this.items = const [],
     this.cursor,
     this.loading = false,
@@ -25,8 +24,6 @@ class SearchState {
   /// The text as typed.
   final String query;
 
-  /// Category chip; null = all.
-  final String? category;
   final List<Article> items;
   final String? cursor;
   final bool loading;
@@ -49,7 +46,6 @@ class SearchState {
 
   SearchState copyWith({
     String? query,
-    String? Function()? category,
     List<Article>? items,
     String? Function()? cursor,
     bool? loading,
@@ -61,7 +57,6 @@ class SearchState {
   }) =>
       SearchState(
         query: query ?? this.query,
-        category: category != null ? category() : this.category,
         items: items ?? this.items,
         cursor: cursor != null ? cursor() : this.cursor,
         loading: loading ?? this.loading,
@@ -126,22 +121,13 @@ class NewsSearchController extends Notifier<SearchState> {
     state = state.copyWith(recent: [query, ...rest].take(5).toList());
   }
 
-  void selectCategory(String? slug) {
-    if (slug == state.category) return;
-    state = state.copyWith(category: () => slug);
-    if (state.query.trim().length >= minChars) {
-      _timer?.cancel();
-      _search();
-    }
-  }
-
   Future<void> loadMore() async {
     final current = state;
     if (!current.hasMore || current.loading || current.loadingMore) return;
     final generation = _generation;
     state = current.copyWith(loadingMore: true, error: () => null);
     try {
-      final page = await _repo.search(query: current.query.trim(), category: current.category, cursor: current.cursor);
+      final page = await _repo.search(query: current.query.trim(), cursor: current.cursor);
       if (generation != _generation) return;
       final seen = {for (final a in state.items) a.url};
       state = state.copyWith(
@@ -160,7 +146,7 @@ class NewsSearchController extends Notifier<SearchState> {
     final query = state.query.trim();
     state = state.copyWith(loading: true, error: () => null, notice: () => null);
     try {
-      final page = await _repo.search(query: query, category: state.category);
+      final page = await _repo.search(query: query);
       if (generation != _generation) return;
       state = state.copyWith(
         items: page.items,

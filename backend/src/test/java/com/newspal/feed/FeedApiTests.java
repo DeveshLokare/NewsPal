@@ -5,10 +5,14 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 import com.jayway.jsonpath.JsonPath;
 import com.newspal.TestcontainersConfiguration;
+import com.newspal.category.Category;
+import com.newspal.category.CategoryRepository;
 import com.newspal.common.UrlUtils;
+import com.newspal.ingestion.IngestionService;
 import com.newspal.support.FakeNewsProvider;
 import com.newspal.support.FakeProviderConfig;
 import com.newspal.support.TestUsers;
@@ -49,6 +53,12 @@ class FeedApiTests {
 	@Autowired
 	private FakeNewsProvider provider;
 
+	@Autowired
+	private IngestionService ingestion;
+
+	@Autowired
+	private CategoryRepository categories;
+
 	private String bearer;
 
 	@BeforeEach
@@ -65,6 +75,62 @@ class FeedApiTests {
 		insert("https://example.com/s1", "sports", hoursAgo(2));
 		insert("https://example.com/t2", "technology", hoursAgo(3));
 		insert("https://example.com/h1", "health", hoursAgo(0));
+	}
+
+	@Test
+	void firstPageSaysWhileARefreshIsRunning() throws Exception {
+		this.jdbc.sql("UPDATE categories SET last_fetched_at = NULL WHERE slug = 'sports'").update();
+		CountDownLatch gate = new CountDownLatch(1);
+		this.provider.latestGate = gate;
+		this.mvc.perform(get("/api/feed").header("Authorization", this.bearer))
+			.andExpect(jsonPath("$.refreshing").value(true));
+		// Asking again while it runs neither queues a second refresh nor loses the flag.
+		this.mvc.perform(get("/api/feed").header("Authorization", this.bearer))
+			.andExpect(jsonPath("$.refreshing").value(true));
+		gate.countDown();
+		awaitNotRefreshing();
+		assertThat(this.provider.calls).hasValue(1);
+	}
+
+	@Test
+	void refreshingEndsWhenTheProviderFails() throws Exception {
+		this.jdbc.sql("UPDATE categories SET last_fetched_at = NULL WHERE slug = 'sports'").update();
+		this.provider.fail = true;
+		this.mvc.perform(get("/api/feed").header("Authorization", this.bearer));
+		// Reading the feed again would queue a retry, so ask the service.
+		List<Category> all = this.categories.findAll();
+		for (int i = 0; i < 100 && this.ingestion.isRefreshing(all); i++) {
+			Thread.sleep(50);
+		}
+		assertThat(this.ingestion.isRefreshing(all)).isFalse();
+		assertThat(this.provider.calls).hasValue(1);
+	}
+
+	@Test
+	void onlyTheFirstPageSaysWhetherItsRefreshing() throws Exception {
+		this.mvc.perform(get("/api/feed").param("size", "1").header("Authorization", this.bearer))
+			.andExpect(jsonPath("$.refreshing").value(false));
+		String body = this.mvc.perform(get("/api/feed").param("size", "1").header("Authorization", this.bearer))
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+		String cursor = JsonPath.read(body, "$.nextCursor");
+		this.mvc.perform(get("/api/feed").param("size", "1").param("cursor", cursor).header("Authorization", this.bearer))
+			.andExpect(jsonPath("$.refreshing").doesNotExist());
+	}
+
+	private void awaitNotRefreshing() throws Exception {
+		for (int i = 0; i < 100; i++) {
+			String body = this.mvc.perform(get("/api/feed").header("Authorization", this.bearer))
+				.andReturn()
+				.getResponse()
+				.getContentAsString();
+			if (!(boolean) JsonPath.read(body, "$.refreshing")) {
+				return;
+			}
+			Thread.sleep(50);
+		}
+		throw new AssertionError("still refreshing");
 	}
 
 	@Test

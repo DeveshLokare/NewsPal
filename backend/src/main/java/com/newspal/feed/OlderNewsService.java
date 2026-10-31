@@ -185,7 +185,7 @@ public class OlderNewsService {
 						a.publishedAt(), slug, archived.contains(e.getKey()));
 			})
 			.toList();
-		return new FeedPage(items, page.nextCursorId(), null);
+		return new FeedPage(items, page.nextCursorId(), null, null);
 	}
 
 	/** For tests: forget cached pages, cursors and per-user counts. */

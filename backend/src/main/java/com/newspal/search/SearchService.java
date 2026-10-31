@@ -73,7 +73,7 @@ public class SearchService {
 			ArticleDto last = items.get(items.size() - 1);
 			next = CursorCodec.encode(last.publishedAt(), last.id());
 		}
-		return new FeedPage(List.copyOf(items), next, null);
+		return new FeedPage(List.copyOf(items), next, null, null);
 	}
 
 	/** For tests: forget per-user counts. */

@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.newspal.article.ArticleStore;
 import com.newspal.category.Category;
@@ -26,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -55,6 +57,12 @@ public class IngestionService {
 
 	private final TaskExecutor executor;
 
+	/** Categories waiting for a background refresh. */
+	private final Set<Short> queued = ConcurrentHashMap.newKeySet();
+
+	/** Categories being refreshed right now, by whichever thread won the claim. */
+	private final Set<Short> running = ConcurrentHashMap.newKeySet();
+
 	public IngestionService(CategoryRepository categories, ArticleStore articles, QuotaService quota,
 			NewsProvider provider, NewsProperties properties, Clock clock,
 			@Qualifier("ingestionExecutor") TaskExecutor executor) {
@@ -74,10 +82,15 @@ public class IngestionService {
 	public void refreshStaleAsync(Collection<Category> candidates) {
 		Instant staleBefore = staleBefore();
 		for (Category category : candidates) {
-			if (isStale(category, staleBefore)) {
-				this.executor.execute(() -> refreshIfStale(category));
+			if (isStale(category, staleBefore) && this.queued.add(category.id())) {
+				queueRefresh(category);
 			}
 		}
+	}
+
+	/** Whether any of these categories is queued or being refreshed (SPEC-v2.1 §6.3). */
+	public boolean isRefreshing(Collection<Category> candidates) {
+		return candidates.stream().anyMatch((c) -> this.queued.contains(c.id()) || this.running.contains(c.id()));
 	}
 
 	/**
@@ -105,6 +118,34 @@ public class IngestionService {
 		if (!this.categories.claimForRefresh(category.id(), now, now.minus(this.properties.refreshTtl()))) {
 			return 0;
 		}
+		this.running.add(category.id());
+		try {
+			return refreshClaimed(category);
+		}
+		finally {
+			this.running.remove(category.id());
+		}
+	}
+
+	private void queueRefresh(Category category) {
+		try {
+			this.executor.execute(() -> {
+				try {
+					refreshIfStale(category);
+				}
+				finally {
+					this.queued.remove(category.id());
+				}
+			});
+		}
+		catch (TaskRejectedException ex) {
+			// A full queue only means refreshes are already pending; never fail a request for it.
+			this.queued.remove(category.id());
+			logger.warn("Ingestion queue full; skipping a refresh of {}", category.slug());
+		}
+	}
+
+	private int refreshClaimed(Category category) {
 		if (!this.quota.tryAcquire(Bucket.INGESTION)) {
 			// Keep the claim so we don't re-check the exhausted quota on every request.
 			logger.warn("Daily ingestion quota used up; not refreshing {}", category.slug());

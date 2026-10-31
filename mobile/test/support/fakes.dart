@@ -30,6 +30,8 @@ class FakeAuthRepository implements AuthRepository {
   ApiError? resetQuestionError;
   final List<String> calls = [];
 
+  List<SecurityQuestion> offered = catalog;
+
   static const catalog = [
     SecurityQuestion(id: 1, text: 'What was the name of your first pet?'),
     SecurityQuestion(id: 2, text: 'What was your favourite subject at school?'),
@@ -72,7 +74,7 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<List<SecurityQuestion>> securityQuestions() async => catalog;
+  Future<List<SecurityQuestion>> securityQuestions() async => offered;
 
   @override
   Future<void> setSecurityQuestion({required String currentPassword, required int questionId, required String answer}) async {
@@ -153,6 +155,7 @@ class FakeFeedRepository implements FeedRepository {
   final Map<String, FeedPageData> pages = {};
   final Map<String, FeedPageData> olderPages = {};
   ApiError? olderError;
+  ApiError? feedError;
   final List<String> calls = [];
 
   static String key(String? category, String? cursor) => '${category ?? ''}|${cursor ?? ''}';
@@ -160,6 +163,7 @@ class FakeFeedRepository implements FeedRepository {
   @override
   Future<FeedPageData> feed({String? category, String? cursor, int size = 20}) async {
     calls.add('feed ${key(category, cursor)}');
+    if (feedError != null) throw feedError!;
     return pages[key(category, cursor)] ?? const FeedPageData(items: [], nextCursor: null);
   }
 
@@ -240,19 +244,19 @@ class FakeArchiveRepository implements ArchiveRepository {
   }
 }
 
-/// Serves scripted search pages. Keys are `query|category|cursor` (empty strings for null).
+/// Serves scripted search pages. Keys are `query|cursor` (empty string for null).
 class FakeSearchRepository implements SearchRepository {
   final Map<String, FeedPageData> pages = {};
   final List<String> calls = [];
   ApiError? error;
 
-  static String key(String query, String? category, String? cursor) => '$query|${category ?? ''}|${cursor ?? ''}';
+  static String key(String query, String? cursor) => '$query|${cursor ?? ''}';
 
   @override
-  Future<FeedPageData> search({required String query, String? category, String? cursor, int size = 20}) async {
-    calls.add(key(query, category, cursor));
+  Future<FeedPageData> search({required String query, String? cursor, int size = 20}) async {
+    calls.add(key(query, cursor));
     if (error != null) throw error!;
-    return pages[key(query, category, cursor)] ?? const FeedPageData(items: [], nextCursor: null);
+    return pages[key(query, cursor)] ?? const FeedPageData(items: [], nextCursor: null);
   }
 }
 
