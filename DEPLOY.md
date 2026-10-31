@@ -60,8 +60,9 @@ You don't need to create any tables. The backend creates them (Flyway) on its fi
 5. When the dashboard says **Live**, open (using your service's URL, shown at the top of its page):
    - `https://newspal-api.onrender.com/actuator/health` → `{"status":"UP"}`
    - `https://newspal-api.onrender.com/api/categories` → the 8 categories. This means the database is connected and migrations ran.
+   - `https://newspal-api.onrender.com/api/auth/security-questions` → the 8 questions. A `401` means an old version is running.
 
-Later pushes to `main` that change anything under `backend/` redeploy automatically.
+Later pushes to `main` that change anything under `backend/` redeploy automatically. After merging, check **Events** in Render for a **Deploy live** on your commit.
 
 ## 4. Check the free-tier behaviour
 
@@ -123,6 +124,7 @@ Free-tier cost: Render is awake about 3 hours a day for these runs, well within 
 | Health check fails, logs show `Connection refused` or `password authentication failed` | Wrong `SPRING_DATASOURCE_*` values. Check the URL starts with `jdbc:postgresql://` and has no `user:password@`. |
 | `FATAL: invalid value for parameter "TimeZone"` | The JVM isn't in UTC. The Dockerfile sets `-Duser.timezone=UTC`; make sure Render builds from `backend/Dockerfile`. |
 | App says "Can't reach NewsPal right now" | Wrong `API_BASE_URL` in the build, or the service is still waking up. Open `/actuator/health` in a browser. |
+| The app works but new features fail or show errors, or the jobs workflow fails at "Check the deployed API is current" | The newest backend isn't deployed. In Render, check **Events** for a missing or failed deploy, and that the branch is `main` with Auto-Deploy on. **Manual Deploy → Deploy latest commit** fixes it; back up Neon first if there are new migrations. |
 | News stops updating while nobody uses the app | The jobs workflow isn't running or failing: check the **Actions** tab (§6). |
 | Feed stays empty | `FREENEWS_API_KEY` is empty or rejected, or the daily budget is used up. The logs show `News provider disabled` or `quota used up`. |
 

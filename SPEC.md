@@ -1,8 +1,8 @@
 # NewsPal — Personalized News App Specification
 
-> Status: v0.2 (released) · updated 2026-10-24 · Hobby project
-> App name: **NewsPal** (final). App version `0.2.0+2`.
-> v0.2 replaced webz.io with Free News API, added a 2-hourly job and daily cleanup, password reset with a security question, search and a logout confirmation. Its planning document, [SPEC-v2.md](SPEC-v2.md), is folded in here and kept only because code comments cite its sections.
+> Status: v0.2.1 (released) · updated 2026-11-01 · Hobby project
+> App name: **NewsPal** (final). App version `0.2.1+3`.
+> v0.2 replaced webz.io with Free News API, added a 2-hourly job and daily cleanup, password reset with a security question, search and a logout confirmation. Its planning document, [SPEC-v2.md](SPEC-v2.md), is folded in here and kept only because code comments cite its sections. v0.2.1 fixed bugs found after that release; see [SPEC-v2.1.md](SPEC-v2.1.md).
 
 ---
 
@@ -52,12 +52,12 @@ Push notifications, custom topics, social sharing, read/unread tracking, passwor
 
 | ID | Story | Acceptance criteria |
 |---|---|---|
-| US-1 | As a visitor I can register with email, password and a security question. | Email is valid and unique; password ≥ 8 chars; a question from the fixed list and an answer with ≥ 3 letters or digits. Success returns a JWT and the user lands on the category picker. Duplicate email → "Email already registered". |
+| US-1 | As a visitor I can register with email, password and a security question. | Email is valid and unique; password ≥ 8 chars; a question from the fixed list, shown in full (long ones wrap), and an answer with ≥ 3 letters or digits. Success returns a JWT and the user lands on the category picker. Duplicate email → "Email already registered". |
 | US-2 | As a user I can log in and stay logged in. | Valid credentials return a JWT stored in secure storage. The app opens straight to the Feed while the token is valid. An expired or invalid token sends the user to Login. |
 | US-3 | As a user I can log out, after confirming. | "Log out" opens "Log out?" / "You'll need to log in again to see your feed." with **Cancel** and **Log out**. Cancel, back or tapping outside does nothing. Log out deletes the token and opens Login. |
 | US-4 | As a new user I pick my categories. | At least 1 category must be selected to continue; the choice is saved on the server. |
 | US-5 | As a user I can change my categories later. | Settings → Categories shows the current selection; saving updates the feed. |
-| US-6 | As a user I see the latest news from my categories. | Feed shows articles from selected categories, newest first, each with image, title, source, relative time and category label. Every category gets new articles about every 2 h. Pull-to-refresh reloads. Infinite scroll loads more. |
+| US-6 | As a user I see the latest news from my categories. | Feed shows articles from selected categories, newest first, each with image, title, source, relative time and category label. Every category gets new articles about every 2 h. Opening the app shows the newest stored articles without a pull, from cold or from the background; stories that arrive during a refresh appear by themselves, or behind a "New stories" button when scrolled down. Pull-to-refresh reloads. Infinite scroll loads more. |
 | US-7 | As a user I can filter the feed to one category. | Chips at the top: "All" plus each selected category. |
 | US-8 | As a user I can read an article. | Tapping a card opens the article inside the app (in-app webview). Links to a different site open in the phone's default browser, and the user stays on the article in the app. See §9.3. |
 | US-9 | As a user I can load older news. | After the stored articles run out, the feed shows a "Load older news" button for a single category, which fetches older articles (up to ~30 days back). If the quota is used up, it shows "Older news unavailable right now". |
@@ -66,9 +66,9 @@ Push notifications, custom topics, social sharing, read/unread tracking, passwor
 | US-12 | As a user I can remove an archived article. | Swipe-to-delete or tap the bookmark again; an undo snackbar appears for 4 s. |
 | US-13 | As a user who forgot my password I can reset it. | Login → "Forgot password?" (email carried over) → the account's question (a question is shown for every email, registered or not) → answer + new password twice → signed in, "Password updated". A wrong answer shows "That answer doesn't match. N attempts left." |
 | US-14 | Guessing is limited. | 5 wrong answers lock resets for that account for 24 h: "Too many attempts. Try again tomorrow." Answers ignore case, extra spaces and punctuation. |
-| US-15 | As a user I can set or change my security question. | Settings → Security question, with the current password. Accounts without one (from v0.1) see a dismissible Feed banner leading there. |
+| US-15 | As a user I can set or change my security question. | Settings → Security question, with the current password. Questions show in full (long ones wrap). Accounts without one (from v0.1) see a dismissible Feed banner leading there. |
 | US-16 | As a user, after a reset, my other devices are signed out. | Any token issued before the reset gets `401` and that device goes to Login. |
-| US-17 | As a user I can search news. | A search icon in the Feed app bar opens Search. Typing ≥ 2 chars shows matching articles (title or summary) from all categories, newest first, as feed cards (bookmark works). Category chips narrow results. "No results for "…"" when nothing matches. |
+| US-17 | As a user I can search news. | A search icon in the Feed app bar opens Search. Typing ≥ 2 chars shows matching articles (title or summary) from all categories, newest first, as feed cards (bookmark works). There's no category filter. "No results for "…"" when nothing matches. |
 
 ---
 
@@ -372,18 +372,20 @@ JWT: HS256; claims `iss` = `newspal`, `sub` = user id, `exp` = 7 days, and `pwc`
     "category": "technology", "archived": false
   }],
   "nextCursor": "MjAyNi0xMC0xN1QwODowMDowMFp8MTIz",
-  "lastRefreshedAt": "2026-10-24T06:00:00Z"
+  "lastRefreshedAt": "2026-10-24T06:00:00Z",
+  "refreshing": false
 }
 ```
 - **Without `category`:** articles from all of the user's categories. **With `category`:** must be followed, otherwise `400`.
 - **Cursor:** base64 of `publishedAt|id` (keyset: `WHERE (published_at, id) < (:p, :i)`). `nextCursor: null` → no more stored articles; the app offers "Load older news".
 - **`archived`:** from a `LEFT JOIN archived_articles ON url_hash AND user_id`.
+- **`refreshing`:** first page only: true while any selected category is queued or being refreshed, by the feed or a job pass. Tracked in memory, as there's one backend instance. Omitted from later pages, `/feed/older` and `/search`.
 
 `GET /feed/older?category={slug}&cursor={opaque?}` returns the same shape with `id: null` and no `lastRefreshedAt` (§5).
 
 `GET /search?q={text}&category={slug?}&cursor={opaque?}&size={1..50}` returns the same shape without `lastRefreshedAt`:
 - `q`: trimmed, 2–100 chars. Parsed with `websearch_to_tsquery('english', …)`, so `"exact phrase"`, `-word` and `or` work and words are stemmed ("launches" ≈ "launch"). The last plain word also matches as a **prefix** (`to_tsquery('english', 'word:*')`), so results appear while typing ("tesl" → Tesla); not for quoted, negated or post-"or" words. Stop words alone ("the") → empty page.
-- Covers **all** categories; `category` may be any known slug (`400` if unknown), followed or not.
+- Covers **all** categories; `category` may be any known slug (`400` if unknown), followed or not. The app stopped sending it in v0.2.1; it stays for older versions.
 - Newest first with the feed's keyset cursor. Never calls the provider.
 - 60 searches per user per minute → `429 SEARCH_RATE_LIMITED`.
 
@@ -458,7 +460,7 @@ public record ProviderArticle(String providerId, String url, String title, Strin
 - The Free News API key and `JOB_TOKEN` are never logged or sent to clients.
 
 ### 8.4 Background work
-- `ingestionExecutor` (core 2, max 4, queue 20) runs the feed's lazy refreshes; a full queue skips a refresh rather than failing a request.
+- `ingestionExecutor` (core 2, max 4, queue 20) runs the feed's lazy refreshes; a full queue skips a refresh rather than failing a request, and that category stops counting as refreshing.
 - Job passes run on their own (virtual) thread, so a full pool can't drop one and leave it marked running.
 
 ---
@@ -521,12 +523,13 @@ Signed-out users can only reach login, register and the two forgot-password rout
 - **dio interceptors:** one adds the `Bearer` token. A `401` on any non-`/api/auth/` call signs out, and the router goes to Login. Timeout is 70 s, to outlast a Render cold start.
 - **Cold start UX:** a request taking more than 3 s shows "Waking up the server… this can take up to a minute."
 - **Feed:** each chip has its own paged list (`feedControllerProvider(category)`). Stored pages first; at the end, "Load older news" switches that list to the older-news endpoint (single category only). `QUOTA_EXHAUSTED` and `OLDER_RATE_LIMITED` become calm notices; other failures keep the list and offer "Try again". Lists reset when the signed-in user changes.
+- **Fresh feed without a pull:** `silentRefresh` reloads the first page with no spinner, on `AppLifecycleListener.onResume` and when returning to a chip, unless that list loaded under 30 s ago. While `refreshing` is true it polls every 10 s, at most 12 times, stopping on an error or when the list leaves the screen. New stories replace the list near the top (under 100 px); further down they wait in `FeedState.pending` behind a "New stories" button. Failures change nothing.
 - **Security question banner:** shown on the Feed when `GET /me` (or the login/reset response) says `hasSecurityQuestion: false`. **Not now** hides it until the next launch; **Set it** opens Settings → Security question.
-- **Register:** the question dropdown is loaded from the API (with a retry if it fails); the answer needs ≥ 3 letters or digits and stays visible while typing.
+- **Register:** the question dropdown is loaded from the API (with a retry if it fails), and long questions wrap in the list and once selected (also in Settings); the answer needs ≥ 3 letters or digits and stays visible while typing.
 - **Settings → Security question:** question, answer and current password; `WRONG_PASSWORD` shows on the password field and doesn't sign out.
 - **Forgot password:** the email typed on Login is carried over; the email and question live in `passwordResetControllerProvider`, never in URLs; opening the answer screen without step 1 goes back to it. `WRONG_ANSWER` shows the attempts left; `RESET_LOCKED` / `RESET_RATE_LIMITED` show a message and disable the button; success signs in via `AuthController.signInWith` with a "Password updated" snackbar.
 - **Logout:** `LogoutDialog` (`Cancel` / `Log out`); only `true` signs out.
-- **Search:** debounced 400 ms after typing stops, at ≥ 2 chars or on submit; a generation counter drops answers to older queries. Chips: "All" + every category. Results reuse `ArticleCard` (bookmark via `bookmarksProvider`) with infinite scroll. States: initial hint and recent searches, loading bar, "No results for "…"", error with "Try again", `SEARCH_RATE_LIMITED` as a calm notice that keeps results. Recent searches: the last 5 **submitted or opened**, in memory only.
+- **Search:** debounced 400 ms after typing stops, at ≥ 2 chars or on submit; a generation counter drops answers to older queries. Results reuse `ArticleCard` (bookmark via `bookmarksProvider`) with infinite scroll. States: initial hint and recent searches, loading bar, "No results for "…"", error with "Try again", `SEARCH_RATE_LIMITED` as a calm notice that keeps results. Recent searches: the last 5 **submitted or opened**, in memory only.
 - **Archive toggle:** optimistic; a shared per-URL override (`bookmarksProvider`) keeps the feed, search, the article screen and the archive in step. Taps while a request is in flight are ignored.
 - **Archive list:** newest-archived first, paged. Swipe left or tap the filled bookmark to remove (`DELETE /archive/{id}`); a 4 s "Undo" re-archives it at the same position.
 - **Empty states:** "No news yet" (feed), "Nothing archived yet" (archive).
@@ -602,7 +605,7 @@ pg_dump --no-owner -Fc -t users -t user_categories -t archived_articles -t secur
 | Flutter widget | App flow (register with question, onboarding, logout with confirm), account flows (logout cancel/outside tap, forgot password incl. lockout and mismatch, security question banner and Settings page), feed and archive pages, search page |
 | Manual | Live run against Free News API (all categories fill, call count matches the API's); browser click-through of the v0.2 screens against the local backend; GitHub Actions run returning `202`; app on a phone against Render |
 
-Totals at v0.2: 181 backend tests, 77 Flutter tests.
+Totals at v0.2.1: 199 backend tests, 90 Flutter tests.
 
 ---
 
@@ -616,7 +619,11 @@ Totals at v0.2: 181 backend tests, 77 Flutter tests.
 | M10 | Security questions and password reset (backend) | Done (PR #3) |
 | M11 | Search (backend) | Done (PR #4) |
 | M12 | App: logout dialog, security question, forgot password, search | Done (PR #5) |
-| M13 | Release 0.2.0+2: docs, APK, tag `v0.2.0` | This release |
+| M13 | Release 0.2.0+2: docs, APK, tag `v0.2.0` | Done (PR #6) |
+| M14 | v0.2.1: deploy the missing backend versions, workflow check | Done |
+| M15 | Remove Search chips, wrap security questions | Done (PR #7) |
+| M16–M17 | Latest stored news without a pull | Done (PR #7) |
+| M18 | Release 0.2.1+3: docs, APK, tag `v0.2.1` | This release |
 
 ---
 

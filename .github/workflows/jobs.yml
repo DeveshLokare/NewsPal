@@ -40,3 +40,17 @@ jobs:
             echo "::error::404: JOB_TOKEN doesn't match the one on Render, or it isn't set there"
           fi
           [ "$status" = "202" ]
+
+      # A deploy that never arrived once went unnoticed for a week (SPEC-v2.1 §3.4).
+      - name: Check the deployed API is current
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            --retry 3 --retry-delay 20 --retry-connrefused --max-time 120 \
+            "${API_BASE_URL%/}/api/auth/security-questions") || status="000"
+          echo "HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::The API isn't serving current routes: check Render's Events for a missing or failed deploy"
+            exit 1
+          fi
