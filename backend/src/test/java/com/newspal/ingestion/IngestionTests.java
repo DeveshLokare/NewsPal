@@ -1,6 +1,7 @@
 package com.newspal.ingestion;
 
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import com.newspal.TestcontainersConfiguration;
+import com.newspal.article.ArticleStore;
 import com.newspal.category.Category;
 import com.newspal.category.CategoryRepository;
 import com.newspal.config.NewsProperties;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -48,6 +51,9 @@ class IngestionTests {
 	private CategoryRepository categories;
 
 	@Autowired
+	private ArticleStore articles;
+
+	@Autowired
 	private FakeNewsProvider provider;
 
 	@Autowired
@@ -64,6 +70,17 @@ class IngestionTests {
 		this.jdbc.sql("DELETE FROM users").update();
 		this.jdbc.sql("DELETE FROM api_usage").update();
 		this.jdbc.sql("UPDATE categories SET last_fetched_at = NULL").update();
+	}
+
+	@Test
+	void aFullQueueNeitherFailsNorLeavesACategoryRefreshing() {
+		IngestionService full = new IngestionService(this.categories, this.articles, this.quota, this.provider,
+				this.properties, Clock.systemUTC(), (task) -> {
+					throw new TaskRejectedException("full");
+				});
+		List<Category> all = this.categories.findAll();
+		full.refreshStaleAsync(all);
+		assertThat(full.isRefreshing(all)).isFalse();
 	}
 
 	@Test

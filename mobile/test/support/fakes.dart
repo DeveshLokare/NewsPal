@@ -155,6 +155,7 @@ class FakeFeedRepository implements FeedRepository {
   final Map<String, FeedPageData> pages = {};
   final Map<String, FeedPageData> olderPages = {};
   ApiError? olderError;
+  ApiError? feedError;
   final List<String> calls = [];
 
   static String key(String? category, String? cursor) => '${category ?? ''}|${cursor ?? ''}';
@@ -162,6 +163,7 @@ class FakeFeedRepository implements FeedRepository {
   @override
   Future<FeedPageData> feed({String? category, String? cursor, int size = 20}) async {
     calls.add('feed ${key(category, cursor)}');
+    if (feedError != null) throw feedError!;
     return pages[key(category, cursor)] ?? const FeedPageData(items: [], nextCursor: null);
   }
 

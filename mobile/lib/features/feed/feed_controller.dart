@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
@@ -30,6 +33,7 @@ class FeedState {
     this.loadMoreError,
     this.notice,
     this.lastRefreshedAt,
+    this.pending,
   });
 
   final List<Article> items;
@@ -44,6 +48,9 @@ class FeedState {
   final String? notice;
   final DateTime? lastRefreshedAt;
 
+  /// A newer first page, held back because the user has scrolled down.
+  final FeedPageData? pending;
+
   FeedState copyWith({
     List<Article>? items,
     FeedPhase? phase,
@@ -51,6 +58,8 @@ class FeedState {
     bool? loadingMore,
     String? Function()? loadMoreError,
     String? Function()? notice,
+    DateTime? lastRefreshedAt,
+    FeedPageData? Function()? pending,
   }) =>
       FeedState(
         items: items ?? this.items,
@@ -59,7 +68,8 @@ class FeedState {
         loadingMore: loadingMore ?? this.loadingMore,
         loadMoreError: loadMoreError != null ? loadMoreError() : this.loadMoreError,
         notice: notice != null ? notice() : this.notice,
-        lastRefreshedAt: lastRefreshedAt,
+        lastRefreshedAt: lastRefreshedAt ?? this.lastRefreshedAt,
+        pending: pending != null ? pending() : this.pending,
       );
 }
 
@@ -70,7 +80,31 @@ final feedControllerProvider =
 class FeedController extends AsyncNotifier<FeedState> {
   FeedController(this.category);
 
+  /// How often to look for new articles while the backend refreshes, and how many
+  /// times: 2 minutes in all (SPEC-v2.1 §6.4).
+  static const pollEvery = Duration(seconds: 10);
+  static const maxPolls = 12;
+
+  /// A list this fresh isn't reloaded on reopening the app or returning to its chip.
+  static const reloadGap = Duration(seconds: 30);
+
   final String? category;
+
+  /// Whether the list is scrolled to the top; set by the page.
+  bool atTop = true;
+
+  @visibleForTesting
+  DateTime Function() now = DateTime.now;
+
+  Timer? _poll;
+  int _pollsLeft = 0;
+
+  /// Polling was paused and should pick up again on the next reload.
+  bool _pollPaused = false;
+  DateTime? _loadedAt;
+
+  /// Bumped on every full load; older silent answers are dropped.
+  int _generation = 0;
 
   FeedRepository get _repo => ref.read(feedRepositoryProvider);
 
@@ -81,13 +115,90 @@ class FeedController extends AsyncNotifier<FeedState> {
   Future<FeedState> build() async {
     // Per user: start over when someone else signs in.
     ref.watch(sessionTokenProvider);
+    ref.onDispose(_stopPolling);
+    _generation++;
     final page = await _repo.feed(category: category);
-    return FeedState(
-      items: page.items,
-      phase: page.nextCursor != null ? FeedPhase.stored : FeedPhase.storedDone,
-      cursor: page.nextCursor,
-      lastRefreshedAt: page.lastRefreshedAt,
-    );
+    _loaded(page);
+    return _firstPage(page);
+  }
+
+  FeedState _firstPage(FeedPageData page) => FeedState(
+        items: page.items,
+        phase: page.nextCursor != null ? FeedPhase.stored : FeedPhase.storedDone,
+        cursor: page.nextCursor,
+        lastRefreshedAt: page.lastRefreshedAt,
+      );
+
+  /// [polled]: the answer to a poll, which never starts polling again. That would
+  /// outlive [maxPolls], or restart it after [pausePolling].
+  void _loaded(FeedPageData page, {bool polled = false}) {
+    _loadedAt = now();
+    if (!page.refreshing) {
+      _stopPolling();
+      _pollPaused = false;
+    } else if (!polled) {
+      _pollPaused = false;
+      if (_poll != null) return;
+      _pollsLeft = maxPolls;
+      _poll = Timer.periodic(pollEvery, (_) {
+        if (--_pollsLeft <= 0) _stopPolling();
+        unawaited(silentRefresh(polled: true));
+      });
+    }
+  }
+
+  void _stopPolling() {
+    _poll?.cancel();
+    _poll = null;
+  }
+
+  /// Stops polling while the list isn't on screen; [reloadIfDue] resumes it.
+  void pausePolling() {
+    if (_poll == null) return;
+    _stopPolling();
+    _pollPaused = true;
+  }
+
+  /// The app was reopened or this list's chip was selected again.
+  Future<void> reloadIfDue() async {
+    final loadedAt = _loadedAt;
+    if (_pollPaused || loadedAt == null || now().difference(loadedAt) >= reloadGap) {
+      await silentRefresh();
+    }
+  }
+
+  /// Reloads the first page without a spinner. New stories replace the list at the
+  /// top; further down they wait in [FeedState.pending], so nothing jumps. A failure
+  /// changes nothing.
+  Future<void> silentRefresh({bool polled = false}) async {
+    if (state.value == null) return;
+    final generation = _generation;
+    final FeedPageData page;
+    try {
+      page = await _repo.feed(category: category);
+    } on ApiError {
+      if (generation == _generation) _stopPolling();
+      return;
+    }
+    final latest = state.value;
+    if (generation != _generation || latest == null || latest.loadingMore) return;
+    _loaded(page, polled: polled);
+    final known = {for (final a in latest.items) a.url};
+    final hasNew = page.items.any((a) => !known.contains(a.url));
+    if (hasNew && atTop) {
+      state = AsyncData(_firstPage(page));
+    } else {
+      state = AsyncData(latest.copyWith(
+        lastRefreshedAt: page.lastRefreshedAt,
+        pending: hasNew ? () => page : null,
+      ));
+    }
+  }
+
+  /// "New stories": shows what [silentRefresh] held back.
+  void showPending() {
+    final pending = state.value?.pending;
+    if (pending != null) state = AsyncData(_firstPage(pending));
   }
 
   /// Pull-to-refresh: reload the first page (which also nudges the backend to

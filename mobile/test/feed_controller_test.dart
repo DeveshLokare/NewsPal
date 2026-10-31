@@ -1,3 +1,4 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:newspal/core/api_error.dart';
@@ -21,6 +22,121 @@ void main() {
   Future<FeedState> load(String? category) => container.read(feedControllerProvider(category).future);
   FeedState current(String? category) => container.read(feedControllerProvider(category)).value!;
   List<String> urls(String? category) => current(category).items.map((a) => a.url).toList();
+
+  group('keeping the list fresh', () {
+    FeedPageData page(List<String> ids, {bool refreshing = false}) =>
+        FeedPageData(items: [for (final id in ids) article(id)], nextCursor: null, refreshing: refreshing);
+    int reads() => fakes.feed.calls.where((c) => c == 'feed |').length;
+
+    test('new stories replace the list at the top', () async {
+      fakes.feed.pages['|'] = page(['1']);
+      await load(null);
+      fakes.feed.pages['|'] = page(['2', '1']);
+      await controller(null).silentRefresh();
+      expect(urls(null), ['https://example.com/2', 'https://example.com/1']);
+      expect(current(null).pending, isNull);
+    });
+
+    test('further down they wait until asked for', () async {
+      fakes.feed.pages['|'] = page(['1']);
+      await load(null);
+      controller(null).atTop = false;
+      fakes.feed.pages['|'] = page(['2', '1']);
+      await controller(null).silentRefresh();
+      expect(urls(null), ['https://example.com/1']);
+      expect(current(null).pending, isNotNull);
+
+      controller(null).showPending();
+      expect(urls(null), ['https://example.com/2', 'https://example.com/1']);
+      expect(current(null).pending, isNull);
+    });
+
+    test('nothing new leaves the list alone', () async {
+      fakes.feed.pages['|'] = page(['1']);
+      await load(null);
+      controller(null).atTop = false;
+      await controller(null).silentRefresh();
+      expect(current(null).pending, isNull);
+    });
+
+    test('a failed reload keeps the list', () async {
+      fakes.feed.pages['|'] = page(['1']);
+      await load(null);
+      fakes.feed.feedError = ApiError(code: ApiError.network, message: 'offline');
+      await controller(null).silentRefresh();
+      expect(urls(null), ['https://example.com/1']);
+    });
+
+    test('reopening reloads, unless the list is under 30 s old', () async {
+      fakes.feed.pages['|'] = page(['1']);
+      await load(null);
+      var time = DateTime(2026, 11, 1, 12);
+      controller(null).now = () => time;
+      await controller(null).silentRefresh();
+      final before = reads();
+
+      time = time.add(FeedController.reloadGap - const Duration(seconds: 1));
+      await controller(null).reloadIfDue();
+      expect(reads(), before);
+
+      time = time.add(const Duration(seconds: 1));
+      await controller(null).reloadIfDue();
+      expect(reads(), before + 1);
+    });
+
+    test('polls while refreshing, then stops', () {
+      fakeAsync((async) {
+        fakes.feed.pages['|'] = page(['1'], refreshing: true);
+        load(null);
+        async.flushMicrotasks();
+        expect(reads(), 1);
+        async.elapse(FeedController.pollEvery * 2);
+        expect(reads(), 3);
+
+        fakes.feed.pages['|'] = page(['1']);
+        async.elapse(FeedController.pollEvery);
+        expect(reads(), 4);
+        async.elapse(FeedController.pollEvery * 3);
+        expect(reads(), 4);
+      });
+    });
+
+    test('polling gives up after 2 minutes', () {
+      fakeAsync((async) {
+        fakes.feed.pages['|'] = page(['1'], refreshing: true);
+        load(null);
+        async.flushMicrotasks();
+        async.elapse(const Duration(minutes: 5));
+        expect(reads(), 1 + FeedController.maxPolls);
+      });
+    });
+
+    test('polling stops on an error and while paused', () {
+      fakeAsync((async) {
+        fakes.feed.pages['|'] = page(['1'], refreshing: true);
+        load(null);
+        async.flushMicrotasks();
+        controller(null).pausePolling();
+        async.elapse(FeedController.pollEvery * 3);
+        expect(reads(), 1);
+
+        controller(null).reloadIfDue();
+        async.flushMicrotasks();
+        expect(reads(), 2, reason: 'paused polling resumes at once');
+
+        fakes.feed.feedError = ApiError(code: ApiError.network, message: 'offline');
+        async.elapse(FeedController.pollEvery);
+        expect(reads(), 3);
+        async.elapse(FeedController.pollEvery * 3);
+        expect(reads(), 3);
+      });
+    });
+  });
+
+  test('a response without refreshing parses as false', () {
+    final page = FeedPageData.fromJson({'items': <dynamic>[], 'nextCursor': null});
+    expect(page.refreshing, isFalse);
+  });
 
   test('first page, then the next page via the cursor', () async {
     fakes.feed.pages['|'] = FeedPageData(items: [article('1'), article('2')], nextCursor: 'c2');
